@@ -86,57 +86,72 @@
         </KpiCard>
       </div>
 
-      <!-- KPIs FINANCIEROS (Sprint 3) -->
+      <!-- KPIs FINANCIEROS (Sprint 3 - Conectados a PostgreSQL) -->
       <div class="kpi-section-label">
-        Indicadores Financieros
-        <span class="sprint-badge">Disponible en Sprint 3</span>
+        Indicadores Financieros en Tiempo Real
+        <span class="badge badge-success">Activo</span>
       </div>
-      <div class="kpi-grid kpi-financial">
+      <div class="kpi-grid">
         <KpiCard
-          title="Pagos del Mes"
-          :value="dashboardStore.stats.monthlyPayments"
-          subtitle="Mensualidades recibidas"
+          title="Recaudo del Mes"
+          :value="formatCurrency(dashboardStore.stats.recaudoMes || dashboardStore.stats.monthlyIncome)"
+          subtitle="Ingresos recibidos este mes"
           iconBgColor="#ECFDF5"
           iconColor="#059669"
-          disabled
-        >
-          <template #icon>
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-              <line x1="1" y1="10" x2="23" y2="10"></line>
-            </svg>
-          </template>
-        </KpiCard>
-
-        <KpiCard
-          title="Pendientes"
-          :value="dashboardStore.stats.pendingMonthlyFees"
-          subtitle="Mensualidades por cobrar"
-          iconBgColor="#FEE2E2"
-          iconColor="#EF4444"
-          disabled
-        >
-          <template #icon>
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
-          </template>
-        </KpiCard>
-
-        <KpiCard
-          title="Ingresos del Mes"
-          :value="formatCurrency(dashboardStore.stats.monthlyIncome)"
-          subtitle="Recaudo total mensual"
-          iconBgColor="#FEF3C7"
-          iconColor="#F59E0B"
-          disabled
+          isPositive
         >
           <template #icon>
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="12" y1="1" x2="12" y2="23"></line>
               <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+            </svg>
+          </template>
+        </KpiCard>
+
+        <KpiCard
+          title="Recaudo del Año"
+          :value="formatCurrency(dashboardStore.stats.recaudoAño || dashboardStore.stats.yearlyIncome)"
+          subtitle="Ingresos en el año en curso"
+          iconBgColor="#EFF6FF"
+          iconColor="#2563EB"
+        >
+          <template #icon>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+            </svg>
+          </template>
+        </KpiCard>
+
+        <KpiCard
+          title="Total Mensualidades"
+          :value="formatCurrency(dashboardStore.stats.totalMensualidades)"
+          subtitle="Total recaudo mensualidades"
+          iconBgColor="#FEF3C7"
+          iconColor="#D97706"
+        >
+          <template #icon>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+          </template>
+        </KpiCard>
+
+        <KpiCard
+          title="Total Inscripciones"
+          :value="formatCurrency(dashboardStore.stats.totalInscripciones)"
+          subtitle="Total recaudo matrículas"
+          iconBgColor="#F3E8FF"
+          iconColor="#9333EA"
+        >
+          <template #icon>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <polyline points="16 11 18 13 22 9"></polyline>
             </svg>
           </template>
         </KpiCard>
@@ -153,6 +168,10 @@
             <router-link to="/students" class="quick-action-btn students">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
               Gestionar Alumnos
+            </router-link>
+            <router-link to="/payments" class="quick-action-btn payments">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+              Gestionar Pagos
             </router-link>
             <router-link to="/settings" class="quick-action-btn settings">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
@@ -181,8 +200,8 @@
               <span>Vue 3 + Pinia: <strong>OK</strong></span>
             </li>
             <li>
-              <span class="status-dot yellow"></span>
-              <span>Módulo Pagos: <strong>Sprint 3</strong></span>
+              <span class="status-dot green"></span>
+              <span>Módulo Pagos: <strong>Activo (Sprint 3)</strong></span>
             </li>
           </ul>
         </div>
@@ -368,6 +387,16 @@ onMounted(async () => {
 
 .quick-action-btn.students:hover {
   background-color: var(--color-primary);
+  color: var(--color-white);
+}
+
+.quick-action-btn.payments {
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.quick-action-btn.payments:hover {
+  background-color: var(--color-success);
   color: var(--color-white);
 }
 

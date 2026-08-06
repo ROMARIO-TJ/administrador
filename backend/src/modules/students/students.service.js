@@ -96,8 +96,9 @@ export class StudentsService {
       where: { id: studentId },
       include: {
         category: true,
-        payments: {
-          orderBy: { createdAt: 'desc' }
+        registration: true,
+        monthlyPayments: {
+          orderBy: { paymentDate: 'desc' }
         }
       }
     });

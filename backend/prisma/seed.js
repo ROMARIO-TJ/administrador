@@ -37,7 +37,7 @@ async function main() {
         phone: '+57 300 123 4567',
         email: 'contacto@unionjaguerafc.com',
         registrationFee: 50000.0,
-        monthlyFee: 80000.0
+        monthlyFee: 50000.0
       }
     });
     console.log('Configuración inicial de Unión Jaguera FC creada.');

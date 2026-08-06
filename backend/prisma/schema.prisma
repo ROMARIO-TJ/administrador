@@ -28,7 +28,7 @@ model AcademySetting {
   phone           String   @default("+57 300 000 0000")
   email           String   @default("contacto@unionjaguerafc.com")
   registrationFee Float    @default(50000.0)
-  monthlyFee      Float    @default(80000.0)
+  monthlyFee      Float    @default(50000.0)
   updatedAt       DateTime @updatedAt
 }
 
@@ -94,19 +94,52 @@ model Student {
   status               StudentStatus @default(ACTIVE)
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
-  payments             Payment[]
+  registration         Registration?
+  monthlyPayments      MonthlyPayment[]
 }
 
-// Pagos (Estructura lista para Sprint 3)
-model Payment {
-  id        Int       @id @default(autoincrement())
-  studentId Int
-  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  amount    Float
-  concept   String
-  period    String
-  status    String    @default("PAID")
-  paidAt    DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+// Modelos del Módulo de Pagos (Sprint 3 - Unión Jaguera FC)
+
+// Inscripciones (Un alumno solo puede tener una inscripción)
+model Registration {
+  id            Int      @id @default(autoincrement())
+  consecutive   String   @unique
+  studentId     Int      @unique
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  amount        Float    @default(50000.0)
+  paymentDate   DateTime @default(now())
+  paymentMethod String   @default("EFECTIVO")
+  notes         String?
+  registeredBy  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
+
+// Mensualidades (Un alumno no puede pagar dos veces el mismo mes del mismo año)
+model MonthlyPayment {
+  id            Int      @id @default(autoincrement())
+  consecutive   String   @unique
+  studentId     Int
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  month         Int
+  year          Int
+  amount        Float    @default(50000.0)
+  paymentDate   DateTime @default(now())
+  paymentMethod String   @default("EFECTIVO")
+  notes         String?
+  registeredBy  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([studentId, month, year])
+}
+
+// Consecutivos automáticos para Recibos/Comprobantes de Pago
+model Consecutive {
+  id           Int      @id @default(autoincrement())
+  name         String   @unique
+  prefix       String
+  currentValue Int      @default(0)
+  updatedAt    DateTime @updatedAt
+}
+

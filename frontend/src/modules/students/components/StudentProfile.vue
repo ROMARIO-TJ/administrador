@@ -61,8 +61,29 @@
       </div>
     </div>
 
-    <!-- REJILLA DE SECCIONES INFORMATIVAS -->
-    <div class="profile-grid">
+    <!-- BARRA NAVEGACIÓN DE PESTAÑAS -->
+    <div class="profile-tabs-bar">
+      <button
+        type="button"
+        :class="['tab-btn', activeTab === 'general' ? 'active' : '']"
+        @click="activeTab = 'general'"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        Perfil General
+      </button>
+
+      <button
+        type="button"
+        :class="['tab-btn', activeTab === 'financial' ? 'active' : '']"
+        @click="activeTab = 'financial'"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+        Estado Financiero
+      </button>
+    </div>
+
+    <!-- PESTAÑA 1: PERFIL GENERAL -->
+    <div v-if="activeTab === 'general'" class="profile-grid">
       <!-- 1. INFORMACIÓN DEPORTIVA -->
       <div class="info-card card-modern">
         <div class="card-section-title">
@@ -179,31 +200,17 @@
       </div>
     </div>
 
-    <!-- SECCIÓN ESPACIO PREPARADO: HISTORIAL DE PAGOS (SPRINT 3) -->
-    <div class="history-placeholder-card card-modern">
-      <div class="card-section-title">
-        <div class="icon-box history">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-        </div>
-        <div>
-          <h3>Historial de Pagos</h3>
-          <p class="subtext">Registro contable y mensualidades del alumno</p>
-        </div>
-        <span class="badge badge-warning prepared-tag">Preparado para Sprint 3</span>
-      </div>
-
-      <div class="empty-history-box">
-        <div class="empty-history-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-        </div>
-        <h4>Sin registros de pago vinculados</h4>
-        <p>El módulo de gestión de pagos y mensualidades estará disponible en el próximo Sprint 3.</p>
-      </div>
+    <!-- PESTAÑA 2: ESTADO FINANCIERO -->
+    <div v-else-if="activeTab === 'financial'">
+      <StudentFinancialStatus :student="student" />
     </div>
   </div>
 </template>
 
 <script setup>
+import { ref } from 'vue';
+import StudentFinancialStatus from './StudentFinancialStatus.vue';
+
 defineProps({
   student: {
     type: Object,
@@ -212,6 +219,9 @@ defineProps({
 });
 
 defineEmits(['edit', 'toggle-status']);
+
+const activeTab = ref('general');
+
 
 const getInitials = (firstName, lastName) => {
   const f = firstName ? firstName.charAt(0) : '';
@@ -254,6 +264,39 @@ const onImageError = (e) => {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+/* Tabs Bar */
+.profile-tabs-bar {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--color-gray-200);
+  padding-bottom: 0.25rem;
+}
+
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--color-gray-500);
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  margin-bottom: -0.25rem;
+}
+
+.tab-btn:hover {
+  color: var(--color-primary);
+}
+
+.tab-btn.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
 }
 
 /* Header Card */
