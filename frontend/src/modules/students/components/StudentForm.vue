@@ -51,7 +51,7 @@
             v-model="form.firstName"
             class="form-control"
             :class="{ 'is-invalid': errors.firstName }"
-            placeholder="Ej. Juan Carlos"
+            placeholder="Ej. Nombres"
             required
           />
           <span v-if="errors.firstName" class="invalid-feedback">{{ errors.firstName }}</span>
@@ -65,7 +65,7 @@
             v-model="form.lastName"
             class="form-control"
             :class="{ 'is-invalid': errors.lastName }"
-            placeholder="Ej. Pérez Gómez"
+            placeholder="Ej. Apellidos"
             required
           />
           <span v-if="errors.lastName" class="invalid-feedback">{{ errors.lastName }}</span>
@@ -226,7 +226,7 @@
             v-model="form.guardianName"
             class="form-control"
             :class="{ 'is-invalid': errors.guardianName }"
-            placeholder="Ej. Carlos Eduardo Pérez"
+            placeholder="Ej. Nombre completo del acudiente"
             required
           />
           <span v-if="errors.guardianName" class="invalid-feedback">{{ errors.guardianName }}</span>

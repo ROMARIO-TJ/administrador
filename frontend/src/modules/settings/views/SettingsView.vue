@@ -648,7 +648,8 @@ const formatDate = (dStr) => {
 /* Tabs Navigation */
 .settings-tabs-bar {
   display: flex;
-  overflow-x: auto;
+  flex-wrap: wrap;
+  width: 100%;
   padding: 0.5rem;
   gap: 0.35rem;
 }

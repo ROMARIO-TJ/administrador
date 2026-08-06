@@ -138,7 +138,7 @@
             <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
           </svg>
         </div>
-        <h3>No se encontraron registros de pago</h3>
+        <h3>No existen pagos registrados.</h3>
         <p>Utilice los botones superiores para registrar el primer pago o ajuste los filtros de búsqueda.</p>
       </div>
 
@@ -372,8 +372,20 @@ const formatMethod = (method) => {
 
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 1.25rem;
+}
+
+@media (max-width: 1024px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .payments-content {

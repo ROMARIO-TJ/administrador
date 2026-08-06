@@ -471,6 +471,19 @@ const executeDeletePermanent = async () => {
   overflow: hidden;
 }
 
+@media (max-width: 1024px) {
+  .modal-form-card {
+    width: 90%;
+  }
+}
+
+@media (max-width: 768px) {
+  .modal-form-card {
+    width: 95%;
+    max-height: 95vh;
+  }
+}
+
 .modal-form-header {
   padding: 1.25rem 1.5rem;
   background-color: var(--color-gray-100);

@@ -70,6 +70,14 @@
           <p>Consultando listado general de alumnos...</p>
         </div>
 
+        <div v-else-if="!reportStore.studentsReport.data || reportStore.studentsReport.data.length === 0" class="empty-state card-modern">
+          <div class="empty-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          </div>
+          <h3>No existen reportes disponibles.</h3>
+          <p>No existen alumnos registrados para mostrar en este reporte.</p>
+        </div>
+
         <div v-else class="table-card card-modern">
           <div class="table-summary-header">
             <span>Total Alumnos: <strong>{{ reportStore.studentsReport.summary.totalStudents || 0 }}</strong></span>
@@ -239,7 +247,7 @@
           <div class="empty-icon-success">
             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
           </div>
-          <h3>¡Excelente! No hay cartera morosa activa</h3>
+          <h3>No existen alumnos morosos.</h3>
           <p>Todos los alumnos están al día con sus mensualidades e inscripciones.</p>
         </div>
 
@@ -450,6 +458,14 @@
           <p>Consultando historial de inscripciones y matrículas...</p>
         </div>
 
+        <div v-else-if="!reportStore.registrationsReport.registrations || reportStore.registrationsReport.registrations.length === 0" class="empty-state card-modern">
+          <div class="empty-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          </div>
+          <h3>No existen inscripciones registradas.</h3>
+          <p>No hay registros de inscripciones para el filtro o período seleccionado.</p>
+        </div>
+
         <div v-else class="table-card card-modern">
           <div class="table-responsive" id="registrations-table-container">
             <table class="data-table">
@@ -507,6 +523,14 @@
         <div v-if="reportStore.loading" class="loading-state card-modern">
           <div class="spinner"></div>
           <p>Generando Libro Diario Financiero de la academia...</p>
+        </div>
+
+        <div v-else-if="!reportStore.movementsReport.movements || reportStore.movementsReport.movements.length === 0" class="empty-state card-modern">
+          <div class="empty-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          </div>
+          <h3>No existen movimientos.</h3>
+          <p>No se han registrado movimientos financieros con los filtros aplicados.</p>
         </div>
 
         <div v-else class="table-card card-modern">
@@ -882,7 +906,8 @@ const getPercentageStr = (amount, total) => {
 /* Tabs Bar */
 .tabs-nav-bar {
   display: flex;
-  overflow-x: auto;
+  flex-wrap: wrap;
+  width: 100%;
   padding: 0.5rem;
   gap: 0.35rem;
 }
@@ -1197,8 +1222,20 @@ const getPercentageStr = (amount, total) => {
 /* Income breakdown */
 .income-kpis-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 1.25rem;
+}
+
+@media (max-width: 1024px) {
+  .income-kpis-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .income-kpis-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .income-breakdown-grid {

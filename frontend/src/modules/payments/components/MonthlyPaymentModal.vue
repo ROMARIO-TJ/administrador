@@ -298,6 +298,19 @@ const handleSubmit = async () => {
   flex-direction: column;
 }
 
+@media (max-width: 1024px) {
+  .modal-card {
+    width: 90%;
+  }
+}
+
+@media (max-width: 768px) {
+  .modal-card {
+    width: 95%;
+    max-height: 95vh;
+  }
+}
+
 .modal-header {
   padding: 1.25rem 1.5rem;
   background-color: var(--color-gray-100);

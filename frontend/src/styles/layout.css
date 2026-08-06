@@ -93,10 +93,12 @@
 /* Área Contenedora Principal */
 .app-main {
   flex: 1;
+  min-width: 0;
   margin-left: var(--sidebar-width);
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  width: calc(100% - var(--sidebar-width));
 }
 
 /* Header Superior Fijo */
@@ -112,6 +114,7 @@
   top: 0;
   z-index: 90;
   box-shadow: var(--shadow-sm);
+  width: 100%;
 }
 
 .header-title-container {
@@ -191,6 +194,9 @@
 .app-content {
   padding: 2rem;
   flex: 1;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 /* Responsive */
@@ -203,5 +209,13 @@
   }
   .app-main {
     margin-left: 70px;
+    width: calc(100% - 70px);
+  }
+  .app-content {
+    padding: 1rem;
+  }
+  .app-header {
+    padding: 0 1rem;
   }
 }
+

@@ -1,5 +1,5 @@
 <template>
-  <div class="table-container card-modern">
+  <div class="card-modern table-responsive">
     <table class="students-table" v-if="students && students.length > 0">
       <thead>
         <tr>
@@ -158,7 +158,7 @@
           <line x1="12" y1="16" x2="12.01" y2="16"></line>
         </svg>
       </div>
-      <h3>No se encontraron alumnos</h3>
+      <h3>No existen alumnos registrados.</h3>
       <p>No hay alumnos registrados que coincidan con la búsqueda o los filtros aplicados.</p>
     </div>
   </div>
