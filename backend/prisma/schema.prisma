@@ -1,0 +1,112 @@
+// Prisma Schema para AcademiaPro - Unión Jaguera FC
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Usuario único Administrador
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("ADMIN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Configuración general de la Academia
+model AcademySetting {
+  id              Int      @id @default(autoincrement())
+  academyName     String   @default("Unión Jaguera FC")
+  address         String   @default("La Jagua de Ibirico, Cesar, Colombia")
+  phone           String   @default("+57 300 000 0000")
+  email           String   @default("contacto@unionjaguerafc.com")
+  registrationFee Float    @default(50000.0)
+  monthlyFee      Float    @default(80000.0)
+  updatedAt       DateTime @updatedAt
+}
+
+// Enums controlados para Alumnos
+enum Gender {
+  MASCULINO
+  FEMENINO
+  OTRO
+}
+
+enum DominantFoot {
+  DERECHO
+  IZQUIERDO
+  AMBIDIESTRO
+}
+
+enum Position {
+  PORTERO
+  DEFENSA
+  MEDIOCAMPISTA
+  DELANTERO
+}
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// Entidad Categoría de Alumnos
+model Category {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  students    Student[]
+}
+
+// Alumnos (Sprint 2 - Unión Jaguera FC)
+model Student {
+  id                   Int           @id @default(autoincrement())
+  photo                String?
+  firstName            String
+  lastName             String
+  document             String        @unique
+  birthDate            DateTime
+  gender               Gender        @default(MASCULINO)
+  categoryId           Int
+  category             Category      @relation(fields: [categoryId], references: [id])
+  entryDate            DateTime      @default(now())
+  position             Position      @default(MEDIOCAMPISTA)
+  dominantFoot         DominantFoot  @default(DERECHO)
+  jerseyNumber         Int?
+  guardianName         String
+  guardianRelationship String
+  guardianPhone        String
+  guardianAddress      String
+  eps                  String
+  allergies            String?
+  medicalNotes         String?
+  generalNotes         String?
+  customMonthlyFee     Float?
+  status               StudentStatus @default(ACTIVE)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  payments             Payment[]
+}
+
+// Pagos (Estructura lista para Sprint 3)
+model Payment {
+  id        Int       @id @default(autoincrement())
+  studentId Int
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  amount    Float
+  concept   String
+  period    String
+  status    String    @default("PAID")
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
