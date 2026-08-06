@@ -73,11 +73,9 @@
             <div class="form-group">
               <label class="form-label">Método de Pago <span class="required">*</span></label>
               <select v-model="form.paymentMethod" class="form-control" required>
-                <option value="EFECTIVO">Efectivo</option>
-                <option value="TRANSFERENCIA">Transferencia Bancaria</option>
-                <option value="NEQUI">Nequi</option>
-                <option value="DAVIPLATA">Daviplata</option>
-                <option value="OTRO">Otro</option>
+                <option v-for="pm in activePaymentMethods" :key="pm.id" :value="pm.name.toUpperCase()">
+                  {{ pm.name }}
+                </option>
               </select>
             </div>
           </div>
@@ -110,8 +108,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, onMounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { usePaymentStore } from '../../../stores/paymentStore';
+import { useSettingsStore } from '../../../stores/settingsStore';
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -122,6 +121,17 @@ const props = defineProps({
 const emit = defineEmits(['close', 'success']);
 
 const paymentStore = usePaymentStore();
+const settingsStore = useSettingsStore();
+
+const activePaymentMethods = computed(() => {
+  if (settingsStore.paymentMethods && settingsStore.paymentMethods.length > 0) {
+    return settingsStore.paymentMethods.filter(pm => pm.active);
+  }
+  return [
+    { id: 1, name: 'Efectivo' }, { id: 2, name: 'Transferencia' },
+    { id: 3, name: 'Nequi' }, { id: 4, name: 'Daviplata' }
+  ];
+});
 
 const submitting = ref(false);
 const errorMessage = ref(null);

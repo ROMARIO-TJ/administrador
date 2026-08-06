@@ -66,6 +66,39 @@ async function main() {
     });
   }
   console.log('Categorías por defecto verificadas/creadas con éxito.');
+
+  // Crear métodos de pago por defecto
+  const defaultPaymentMethods = [
+    { name: 'Efectivo', active: true },
+    { name: 'Nequi', active: true },
+    { name: 'Daviplata', active: true },
+    { name: 'Bancolombia', active: true },
+    { name: 'Transferencia', active: true },
+    { name: 'Tarjeta', active: true }
+  ];
+
+  for (const pm of defaultPaymentMethods) {
+    await prisma.paymentMethod.upsert({
+      where: { name: pm.name },
+      update: {},
+      create: pm
+    });
+  }
+  console.log('Métodos de pago por defecto verificados.');
+
+  // Crear Temporada 2026 activa por defecto
+  const existingSeason = await prisma.season.findFirst();
+  if (!existingSeason) {
+    await prisma.season.create({
+      data: {
+        name: 'Temporada 2026',
+        startDate: new Date(2026, 0, 1),
+        endDate: new Date(2026, 11, 31),
+        status: 'ACTIVE'
+      }
+    });
+    console.log('Temporada 2026 creada como activa.');
+  }
 }
 
 main()

@@ -22,14 +22,62 @@ model User {
 
 // Configuración general de la Academia
 model AcademySetting {
-  id              Int      @id @default(autoincrement())
-  academyName     String   @default("Unión Jaguera FC")
-  address         String   @default("La Jagua de Ibirico, Cesar, Colombia")
-  phone           String   @default("+57 300 000 0000")
-  email           String   @default("contacto@unionjaguerafc.com")
-  registrationFee Float    @default(50000.0)
-  monthlyFee      Float    @default(50000.0)
-  updatedAt       DateTime @updatedAt
+  id                   Int      @id @default(autoincrement())
+  // Información Institucional
+  academyName          String   @default("Unión Jaguera FC")
+  shortName            String   @default("UJFC")
+  logo                 String?
+  favicon              String?
+  address              String   @default("La Jagua de Ibirico, Cesar, Colombia")
+  city                 String   @default("La Jagua de Ibirico")
+  department           String   @default("Cesar")
+  country              String   @default("Colombia")
+  phone                String   @default("+57 300 000 0000")
+  whatsapp             String   @default("+57 300 000 0000")
+  email                String   @default("contacto@unionjaguerafc.com")
+  website              String   @default("https://unionjaguerafc.com")
+  nit                  String   @default("900.000.000-1")
+  representative       String   @default("Junta Directiva Unión Jaguera FC")
+  description          String?
+
+  // Configuración Financiera
+  registrationFee      Float    @default(50000.0)
+  monthlyFee           Float    @default(50000.0)
+  dueDay               Int      @default(10)
+  currency             String   @default("COP")
+  currencySymbol       String   @default("$")
+  allowDiscounts       Boolean  @default(true)
+  allowPartialPayments Boolean  @default(true)
+
+  // Apariencia
+  primaryColor         String   @default("#2563EB")
+  secondaryColor       String   @default("#64748B")
+  buttonColor          String   @default("#2563EB")
+  dashboardColor       String   @default("#0F172A")
+  themeMode            String   @default("LIGHT")
+
+  updatedAt            DateTime @updatedAt
+}
+
+// Temporadas Deportivas (Sprint 5)
+model Season {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  startDate DateTime
+  endDate   DateTime
+  status    String   @default("ACTIVE") // ACTIVE, INACTIVE, FINISHED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Métodos de Pago Dinámicos (Sprint 5)
+model PaymentMethod {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  icon      String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Enums controlados para Alumnos
@@ -62,6 +110,10 @@ model Category {
   id          Int       @id @default(autoincrement())
   name        String    @unique
   description String?
+  color       String    @default("#2563EB")
+  minAge      Int       @default(4)
+  maxAge      Int       @default(20)
+  order       Int       @default(0)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   students    Student[]
