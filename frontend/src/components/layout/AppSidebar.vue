@@ -1,7 +1,11 @@
 <template>
   <aside class="app-sidebar">
     <div class="sidebar-header">
-      <div class="sidebar-logo">UJ</div>
+      <div v-if="settingsStore.settings.logo" class="sidebar-logo-img-wrap">
+        <img :src="settingsStore.settings.logo" :alt="settingsStore.settings.shortName" class="sidebar-logo-img" />
+      </div>
+
+      <div v-else class="sidebar-logo">{{ settingsStore.settings.shortName || 'UJ' }}</div>
       <span class="sidebar-title">AcademiaPro</span>
     </div>
 
@@ -65,4 +69,7 @@
 </template>
 
 <script setup>
+import { useSettingsStore } from '../../stores/settingsStore';
+
+const settingsStore = useSettingsStore();
 </script>

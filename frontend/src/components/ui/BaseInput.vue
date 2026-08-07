@@ -9,6 +9,7 @@
         :placeholder="placeholder"
         :required="required"
         :disabled="disabled"
+        :autocomplete="autocomplete"
         class="base-input"
         :class="{ 'has-error': error }"
         @input="$emit('update:modelValue', $event.target.value)"
@@ -51,6 +52,10 @@ defineProps({
   error: {
     type: String,
     default: ''
+  },
+  autocomplete: {
+    type: String,
+    default: 'on'
   }
 });
 

@@ -301,12 +301,16 @@ export class StudentsService {
     const studentId = Number(id);
     const student = await this.getStudentById(studentId);
 
-    // Verificar si existen relaciones contables (Pagos) u otras entidades asociadas
-    const paymentsCount = await prisma.payment.count({
+    // Verificar si existen relaciones contables (Inscripciones o Mensualidades) asociadas al alumno
+    const registrationsCount = await prisma.registration.count({
       where: { studentId }
     });
 
-    if (paymentsCount > 0) {
+    const monthlyPaymentsCount = await prisma.monthlyPayment.count({
+      where: { studentId }
+    });
+
+    if (registrationsCount > 0 || monthlyPaymentsCount > 0) {
       const error = new Error('No es posible eliminar físicamente al alumno porque posee registros relacionados en el sistema (pagos, asistencias u otro historial). Para proteger la integridad de la información, el alumno debe mantenerse en estado Inactivo.');
       error.statusCode = 400;
       throw error;

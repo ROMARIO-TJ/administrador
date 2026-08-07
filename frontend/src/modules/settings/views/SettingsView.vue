@@ -97,6 +97,71 @@
             <textarea v-model="institutionalForm.description" class="form-control" rows="3"></textarea>
           </div>
 
+          <!-- Logo Institucional -->
+          <div class="logo-section">
+            <h4 class="logo-section-title">Logo Institucional</h4>
+            <p class="section-sub">Se mostrará en el Sidebar, Header, recibos y exportaciones</p>
+            <div class="logo-manager">
+
+              <!-- Previsualización -->
+              <div class="logo-preview-wrap">
+                <img
+                  v-if="institutionalForm.logo"
+                  :src="institutionalForm.logo"
+                  alt="Logo institucional"
+                  class="logo-preview-img"
+                />
+                <div v-else class="logo-preview-placeholder">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  <span>Sin logo</span>
+                </div>
+              </div>
+
+              <!-- Controles de carga -->
+              <div class="logo-input-area">
+
+                <!-- Botón seleccionar archivo desde PC -->
+                <label class="logo-upload-btn" for="logo-file-input">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  Seleccionar imagen desde mi PC
+                </label>
+                <input
+                  id="logo-file-input"
+                  type="file"
+                  accept="image/png,image/jpg,image/jpeg,image/svg+xml"
+                  class="logo-file-hidden"
+                  @change="onLogoFileChange"
+                />
+                <small class="help-text">PNG, JPG, JPEG o SVG. La imagen se cargará automáticamente.</small>
+
+                <!-- Separador -->
+                <div class="logo-or-divider"><span>o</span></div>
+
+                <!-- Campo URL manual -->
+                <label class="logo-url-label">Pegar URL de imagen</label>
+                <input
+                  type="text"
+                  v-model="institutionalForm.logo"
+                  class="form-control"
+                  placeholder="https://ejemplo.com/logo.png"
+                />
+
+                <!-- Botón quitar logo -->
+                <button
+                  v-if="institutionalForm.logo"
+                  type="button"
+                  class="btn-sm btn-outline-danger mt-2"
+                  @click="removeLogo"
+                >
+                  ✕ Quitar Logo
+                </button>
+
+                <!-- Indicador de carga -->
+                <span v-if="logoLoading" class="logo-loading-text">⏳ Cargando imagen...</span>
+              </div>
+            </div>
+          </div>
+
           <div class="form-actions">
             <button type="submit" class="btn btn-primary" :disabled="store.loading">
               Guardar Información General
@@ -492,7 +557,7 @@ const tabs = [
 const institutionalForm = reactive({
   academyName: '', shortName: '', nit: '', representative: '',
   email: '', phone: '', whatsapp: '', website: '',
-  address: '', city: '', department: '', description: ''
+  address: '', city: '', department: '', description: '', logo: ''
 });
 
 const financialForm = reactive({
@@ -523,6 +588,88 @@ onMounted(async () => {
   Object.assign(financialForm, store.settings);
   Object.assign(appearanceForm, store.settings);
 });
+
+// Logo institucional — carga desde PC
+const logoLoading = ref(false);
+
+const onLogoFileChange = (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // Validar tipo de archivo
+  const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
+  if (!allowedTypes.includes(file.type)) {
+    alert('Formato no permitido. Solo se aceptan: PNG, JPG, JPEG, SVG.');
+    event.target.value = '';
+    return;
+  }
+
+  logoLoading.value = true;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+      const maxSize = 300;
+
+      // Calcular nuevas dimensiones conservando proporción
+      if (width > maxSize || height > maxSize) {
+        if (width > height) {
+          height = Math.round((height * maxSize) / width);
+          width = maxSize;
+        } else {
+          width = Math.round((width * maxSize) / height);
+          height = maxSize;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Exportar (mantenemos PNG para transparencia si no es explícitamente JPEG)
+      const outputType = file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png';
+      const quality = outputType === 'image/jpeg' ? 0.9 : undefined;
+      const resizedBase64 = canvas.toDataURL(outputType, quality);
+
+      // Calcular peso aproximado en KB de la imagen optimizada (base64)
+      const sizeInBytes = Math.round((resizedBase64.length * 3) / 4);
+      
+      if (sizeInBytes > 500 * 1024) {
+        alert('La imagen optimizada supera los 500 KB. Por favor, utilice una imagen más pequeña.');
+      } else {
+        institutionalForm.logo = resizedBase64;
+      }
+      
+      logoLoading.value = false;
+    };
+    
+    img.onerror = () => {
+      alert('Error al procesar la imagen.');
+      logoLoading.value = false;
+    };
+
+    img.src = e.target.result;
+  };
+  
+  reader.onerror = () => {
+    alert('Error al leer el archivo. Intente de nuevo.');
+    logoLoading.value = false;
+  };
+  
+  reader.readAsDataURL(file);
+
+  // Limpiar el input para permitir volver a seleccionar el mismo archivo
+  event.target.value = '';
+};
+
+const removeLogo = () => {
+  institutionalForm.logo = '';
+};
 
 const saveInstitutional = async () => {
   await store.updateInstitutional(institutionalForm);
@@ -895,4 +1042,120 @@ const formatDate = (dStr) => {
 .modal-footer { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem; }
 .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; }
 .mt-2 { margin-top: 0.5rem; }
+
+/* Logo Institucional */
+.logo-section {
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-gray-200);
+}
+
+.logo-section-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--color-dark);
+  margin-bottom: 0.2rem;
+}
+
+.logo-manager {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.logo-preview-wrap {
+  width: 110px;
+  height: 110px;
+  border: 2px dashed var(--color-gray-300);
+  border-radius: var(--border-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-gray-100);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.logo-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 4px;
+}
+
+.logo-preview-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--color-gray-400);
+  font-size: 0.78rem;
+}
+
+.logo-input-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Input file oculto */
+.logo-file-hidden {
+  display: none;
+}
+
+/* Botón estilizado para seleccionar archivo */
+.logo-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  background-color: var(--color-primary-light);
+  border: 1.5px dashed var(--color-primary);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  width: fit-content;
+}
+
+.logo-upload-btn:hover {
+  background-color: var(--color-primary);
+  color: var(--color-white);
+}
+
+/* Separador "o" */
+.logo-or-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.25rem 0;
+  color: var(--color-gray-400);
+  font-size: 0.8rem;
+}
+
+.logo-or-divider::before,
+.logo-or-divider::after {
+  content: '';
+  flex: 1;
+  max-width: 60px;
+  height: 1px;
+  background-color: var(--color-gray-200);
+}
+
+/* Label URL */
+.logo-url-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-gray-600);
+}
+
+/* Indicador de carga */
+.logo-loading-text {
+  font-size: 0.82rem;
+  color: var(--color-primary);
+  font-weight: 600;
+}
 </style>
