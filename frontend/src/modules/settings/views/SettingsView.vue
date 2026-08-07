@@ -3,7 +3,7 @@
     <div class="settings-header">
       <div>
         <h2 class="page-title">Centro de Configuración</h2>
-        <p class="page-subtitle">Administración integral de la academia — Unión Jaguera FC</p>
+        <p class="page-subtitle">Administración integral de la academia — {{ store.settings.academyName || 'Cargando...' }}</p>
       </div>
 
       <div v-if="store.successMessage" class="alert-toast success-toast">

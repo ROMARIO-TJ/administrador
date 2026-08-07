@@ -16,9 +16,9 @@
 
         <BaseInput
           v-model="email"
-          label="Correo Electrónico"
-          type="email"
-          placeholder="Ingrese su correo"
+          label="Usuario / Correo Electrónico"
+          type="text"
+          placeholder="Ingrese su usuario o correo"
           autocomplete="username"
           required
         />
