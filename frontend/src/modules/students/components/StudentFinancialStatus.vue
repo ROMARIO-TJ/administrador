@@ -18,7 +18,9 @@
           <div class="kpi-info">
             <span class="kpi-title">Total Pagado</span>
             <h3 class="kpi-value text-success">{{ formatCurrency(statusData.totalPaid) }}</h3>
-            <span class="kpi-subtitle">Sumatoria total de recaudos</span>
+            <span class="kpi-subtitle font-xs">
+              M: {{ formatCurrency(statusData.totalPaidMensualidades) }} | I: {{ formatCurrency(statusData.totalPaidInscripciones) }}
+            </span>
           </div>
         </div>
 
@@ -127,12 +129,14 @@
               <span class="month-name">{{ m.monthName }}</span>
               <span v-if="m.isPaid" class="month-badge paid">Pagado</span>
               <span v-else-if="m.status === 'PENDING'" class="month-badge pending">Pendiente</span>
+              <span v-else-if="m.status === 'NOT_APPLICABLE'" class="month-badge na">Inactivo</span>
               <span v-else class="month-badge future">Próximo</span>
             </div>
 
             <div class="month-body">
               <template v-if="m.isPaid && m.payment">
-                <span class="month-amount">{{ formatCurrency(m.payment.amount) }}</span>
+                <span v-if="m.payment.amount === 0 && m.payment.paymentMethod === 'EXONERADO'" class="month-amount text-muted">Exonerado</span>
+                <span v-else class="month-amount">{{ formatCurrency(m.payment.amount) }}</span>
                 <span class="month-date">{{ formatDateShort(m.payment.paymentDate) }}</span>
                 <span class="month-consecutive">{{ m.payment.consecutive }}</span>
               </template>
@@ -145,6 +149,10 @@
                 >
                   Pagar {{ m.monthName }}
                 </button>
+              </template>
+              <template v-else-if="m.status === 'NOT_APPLICABLE'">
+                <span class="month-amount text-muted">-</span>
+                <span class="month-date text-muted">Previo a ingreso</span>
               </template>
               <template v-else>
                 <span class="month-amount text-muted">{{ formatCurrency(statusData.effectiveMonthlyFee) }}</span>
@@ -290,6 +298,7 @@ const handlePaymentSuccess = () => {
 const getMonthBoxClass = (m) => {
   if (m.isPaid) return 'box-paid';
   if (m.status === 'PENDING') return 'box-pending';
+  if (m.status === 'NOT_APPLICABLE') return 'box-na';
   return 'box-future';
 };
 
@@ -582,6 +591,12 @@ const formatMethod = (method) => {
   border-color: #FECACA;
 }
 
+.box-na {
+  background-color: var(--color-gray-50);
+  border-color: var(--color-gray-200);
+  opacity: 0.6;
+}
+
 .box-future {
   background-color: var(--color-gray-100);
   border-color: var(--color-gray-200);
@@ -615,6 +630,11 @@ const formatMethod = (method) => {
 .month-badge.pending {
   background-color: #FEE2E2;
   color: #B91C1C;
+}
+
+.month-badge.na {
+  background-color: var(--color-gray-200);
+  color: var(--color-gray-500);
 }
 
 .month-badge.future {

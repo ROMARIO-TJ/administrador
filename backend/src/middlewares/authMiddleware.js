@@ -18,6 +18,6 @@ export const authenticateToken = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (error) {
-    return errorResponse(res, 'Token inválido o expirado.', 403);
+    return errorResponse(res, 'Token inválido o expirado.', 401);
   }
 };

@@ -217,8 +217,13 @@ export class PaymentsService {
       let status = 'FUTURE';
       if (isPaid) {
         status = 'PAID';
-      } else if (targetYear < currentYear || (targetYear === currentYear && monthNum <= currentMonth)) {
-        status = 'PENDING';
+      } else {
+        const entryDate = student.entryDate ? new Date(student.entryDate) : null;
+        if (entryDate && (targetYear < entryDate.getFullYear() || (targetYear === entryDate.getFullYear() && monthNum < entryDate.getMonth() + 1))) {
+          status = 'NOT_APPLICABLE';
+        } else if (targetYear < currentYear || (targetYear === currentYear && monthNum <= currentMonth)) {
+          status = 'PENDING';
+        }
       }
 
       return {
@@ -298,6 +303,8 @@ export class PaymentsService {
       yearMonthlyGrid,
       history,
       totalPaid,
+      totalPaidInscripciones,
+      totalPaidMensualidades,
       pendingBalance
     };
   }
@@ -426,8 +433,9 @@ export class PaymentsService {
     const allPayments = [...formattedRegistrations, ...formattedMonthly];
     allPayments.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate));
 
-    // Resumen estadístico del módulo
     const totalAmountCollected = allPayments.reduce((acc, p) => acc + p.amount, 0);
+    const monthlyAmountCollected = formattedMonthly.reduce((acc, p) => acc + p.amount, 0);
+    const registrationAmountCollected = formattedRegistrations.reduce((acc, p) => acc + p.amount, 0);
     const registrationCount = formattedRegistrations.length;
     const monthlyCount = formattedMonthly.length;
 
@@ -436,6 +444,8 @@ export class PaymentsService {
       summary: {
         totalPayments: allPayments.length,
         totalAmountCollected,
+        monthlyAmountCollected,
+        registrationAmountCollected,
         registrationCount,
         monthlyCount
       }

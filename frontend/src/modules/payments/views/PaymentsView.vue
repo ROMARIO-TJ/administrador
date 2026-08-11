@@ -54,7 +54,7 @@
 
       <KpiCard
         title="Total Mensualidades"
-        :value="formatCurrency(paymentStore.summary.totalAmountCollected)"
+        :value="formatCurrency(paymentStore.summary.monthlyAmountCollected || 0)"
         :subtitle="`${paymentStore.summary.monthlyCount} mensualidades registradas`"
         iconBgColor="#FEF3C7"
         iconColor="#D97706"
@@ -71,8 +71,8 @@
 
       <KpiCard
         title="Total Inscripciones"
-        :value="`${paymentStore.summary.registrationCount} Inscripciones`"
-        subtitle="Alumnos matriculados"
+        :value="formatCurrency(paymentStore.summary.registrationAmountCollected || 0)"
+        :subtitle="`${paymentStore.summary.registrationCount} alumnos matriculados`"
         iconBgColor="#F3E8FF"
         iconColor="#9333EA"
       >

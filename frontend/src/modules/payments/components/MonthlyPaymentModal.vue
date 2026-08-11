@@ -65,6 +65,14 @@
             </div>
           </div>
 
+          <!-- Opción de Exonerar (Inasistencia) -->
+          <div class="form-group checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="form.isExempt" @change="onExemptChange" />
+              <span>Exonerar cobro por inasistencia (No se cobrará este mes)</span>
+            </label>
+          </div>
+
           <!-- Valor de la Mensualidad -->
           <div class="form-group">
             <label class="form-label">Valor de Mensualidad (COP) <span class="required">*</span></label>
@@ -78,6 +86,7 @@
                 min="0"
                 step="1000"
                 required
+                :disabled="form.isExempt"
               />
             </div>
             <small class="hint-text">
@@ -95,10 +104,11 @@
             <!-- Método de Pago -->
             <div class="form-group">
               <label class="form-label">Método de Pago <span class="required">*</span></label>
-              <select v-model="form.paymentMethod" class="form-control" required>
+              <select v-model="form.paymentMethod" class="form-control" required :disabled="form.isExempt">
                 <option v-for="pm in activePaymentMethods" :key="pm.id" :value="pm.name.toUpperCase()">
                   {{ pm.name }}
                 </option>
+                <option v-if="form.isExempt" value="EXONERADO">Exonerado (Sin Costo)</option>
               </select>
             </div>
           </div>
@@ -181,13 +191,19 @@ const form = reactive({
   amount: 50000,
   paymentDate: getTodayString(),
   paymentMethod: 'EFECTIVO',
-  notes: ''
+  notes: '',
+  isExempt: false
 });
 
 const updateSuggestedAmount = () => {
   let targetStudent = props.student;
   if (!targetStudent && form.studentId) {
     targetStudent = props.students.find(s => s.id === form.studentId);
+  }
+
+  if (form.isExempt) {
+    form.amount = 0;
+    return;
   }
 
   if (targetStudent && targetStudent.effectiveMonthlyFee !== undefined && targetStudent.effectiveMonthlyFee !== null) {
@@ -203,6 +219,22 @@ const onStudentChange = () => {
   updateSuggestedAmount();
 };
 
+const onExemptChange = () => {
+  if (form.isExempt) {
+    form.amount = 0;
+    form.paymentMethod = 'EXONERADO';
+    if (!form.notes) {
+      form.notes = 'Exonerado por inasistencia';
+    }
+  } else {
+    form.paymentMethod = 'EFECTIVO';
+    if (form.notes === 'Exonerado por inasistencia') {
+      form.notes = '';
+    }
+    updateSuggestedAmount();
+  }
+};
+
 const resetForm = async () => {
   errorMessage.value = null;
   form.studentId = props.student ? props.student.id : '';
@@ -211,6 +243,7 @@ const resetForm = async () => {
   form.paymentDate = getTodayString();
   form.paymentMethod = 'EFECTIVO';
   form.notes = '';
+  form.isExempt = false;
 
   await paymentStore.fetchDefaultFees();
   updateSuggestedAmount();
@@ -428,6 +461,37 @@ const handleSubmit = async () => {
   border-radius: var(--border-radius-md);
   outline: none;
   transition: var(--transition-fast);
+}
+
+.form-control:disabled {
+  background-color: var(--color-gray-100);
+  color: var(--color-gray-500);
+  cursor: not-allowed;
+}
+
+.checkbox-group {
+  margin: 0.5rem 0;
+  padding: 0.75rem;
+  background-color: #F8FAFC;
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--color-gray-200);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-dark);
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--color-primary);
+  cursor: pointer;
 }
 
 .form-control:focus {
