@@ -71,7 +71,16 @@ export async function getDebtorsReport(filters = {}) {
     const paidMonthsSet = new Set(st.monthlyPayments.map(p => p.month));
     const pendingMonthsNames = [];
 
-    for (let m = 1; m <= currentMonth; m++) {
+    const entryDate = st.entryDate ? new Date(st.entryDate) : null;
+    let startMonth = 1;
+
+    if (entryDate && currentYear === entryDate.getFullYear()) {
+      startMonth = entryDate.getMonth() + 1;
+    } else if (entryDate && currentYear < entryDate.getFullYear()) {
+      startMonth = 13; // Evita cobrar si el año evaluado es anterior al año de ingreso
+    }
+
+    for (let m = startMonth; m <= currentMonth; m++) {
       if (!paidMonthsSet.has(m)) {
         pendingMonthsNames.push(MONTH_NAMES[m - 1]);
       }

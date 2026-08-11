@@ -8,24 +8,27 @@ export async function getIncomeReport(filters = {}) {
   const { period = 'month', startDate, endDate } = filters;
 
   const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const date = now.getDate();
 
-  // Fecha Inicio y Fin del Día de hoy
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  // Fecha Inicio y Fin del Día de hoy (UTC Boundaries)
+  const startOfToday = new Date(Date.UTC(year, month, date));
+  const endOfToday = new Date(Date.UTC(year, month, date + 1));
 
   // Fecha Inicio y Fin de la Semana (Lunes a Domingo)
   const dayOfWeek = now.getDay();
   const diffToMonday = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
-  const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
-  const endOfWeek = new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate() + 6, 23, 59, 59, 999);
+  const startOfWeek = new Date(Date.UTC(year, month, date + diffToMonday));
+  const endOfWeek = new Date(Date.UTC(year, month, date + diffToMonday + 7));
 
   // Fecha Inicio y Fin del Mes
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const startOfMonth = new Date(Date.UTC(year, month, 1));
+  const endOfMonth = new Date(Date.UTC(year, month + 1, 1));
 
   // Fecha Inicio y Fin del Año
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const endOfYear = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+  const startOfYear = new Date(Date.UTC(year, 0, 1));
+  const endOfYear = new Date(Date.UTC(year + 1, 0, 1));
 
   // Determinar rango para el filtro seleccionado
   let filterStart = startOfMonth;
@@ -42,8 +45,8 @@ export async function getIncomeReport(filters = {}) {
     filterEnd = endOfYear;
   } else if (period === 'custom' && startDate && endDate) {
     filterStart = new Date(startDate);
-    filterEnd = new Date(endDate);
-    filterEnd.setHours(23, 59, 59, 999);
+    const end = new Date(endDate);
+    filterEnd = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate() + 1));
   }
 
   // Agregaciones fijas para KPIs de la parte superior
@@ -57,28 +60,28 @@ export async function getIncomeReport(filters = {}) {
     filteredRegs, filteredMonths
   ] = await Promise.all([
     // Hoy
-    prisma.registration.aggregate({ _sum: { amount: true }, where: { paymentDate: { gte: startOfToday, lte: endOfToday } } }),
-    prisma.monthlyPayment.aggregate({ _sum: { amount: true }, where: { paymentDate: { gte: startOfToday, lte: endOfToday } } }),
+    prisma.registration.aggregate({ _sum: { amount: true }, where: { paymentDate: { gte: startOfToday, lt: endOfToday } } }),
+    prisma.monthlyPayment.aggregate({ _sum: { amount: true }, where: { paymentDate: { gte: startOfToday, lt: endOfToday } } }),
     // Semana
-    prisma.registration.aggregate({ _sum: { amount: true }, where: { paymentDate: { gte: startOfWeek, lte: endOfWeek } } }),
-    prisma.monthlyPayment.aggregate({ _sum: { amount: true }, where: { paymentDate: { gte: startOfWeek, lte: endOfWeek } } }),
+    prisma.registration.aggregate({ _sum: { amount: true }, where: { paymentDate: { gte: startOfWeek, lt: endOfWeek } } }),
+    prisma.monthlyPayment.aggregate({ _sum: { amount: true }, where: { paymentDate: { gte: startOfWeek, lt: endOfWeek } } }),
     // Mes
-    prisma.registration.aggregate({ _sum: { amount: true }, where: { paymentDate: { gte: startOfMonth, lte: endOfMonth } } }),
-    prisma.monthlyPayment.aggregate({ _sum: { amount: true }, where: { paymentDate: { gte: startOfMonth, lte: endOfMonth } } }),
+    prisma.registration.aggregate({ _sum: { amount: true }, where: { paymentDate: { gte: startOfMonth, lt: endOfMonth } } }),
+    prisma.monthlyPayment.aggregate({ _sum: { amount: true }, where: { paymentDate: { gte: startOfMonth, lt: endOfMonth } } }),
     // Año
-    prisma.registration.aggregate({ _sum: { amount: true }, where: { paymentDate: { gte: startOfYear, lte: endOfYear } } }),
-    prisma.monthlyPayment.aggregate({ _sum: { amount: true }, where: { paymentDate: { gte: startOfYear, lte: endOfYear } } }),
+    prisma.registration.aggregate({ _sum: { amount: true }, where: { paymentDate: { gte: startOfYear, lt: endOfYear } } }),
+    prisma.monthlyPayment.aggregate({ _sum: { amount: true }, where: { paymentDate: { gte: startOfYear, lt: endOfYear } } }),
     // Total histórico
     prisma.registration.aggregate({ _sum: { amount: true } }),
     prisma.monthlyPayment.aggregate({ _sum: { amount: true } }),
 
     // Detalle filtrado
     prisma.registration.findMany({
-      where: { paymentDate: { gte: filterStart, lte: filterEnd } },
+      where: { paymentDate: { gte: filterStart, lt: filterEnd } },
       include: { student: { select: { firstName: true, lastName: true, document: true } } }
     }),
     prisma.monthlyPayment.findMany({
-      where: { paymentDate: { gte: filterStart, lte: filterEnd } },
+      where: { paymentDate: { gte: filterStart, lt: filterEnd } },
       include: { student: { select: { firstName: true, lastName: true, document: true } } }
     })
   ]);
