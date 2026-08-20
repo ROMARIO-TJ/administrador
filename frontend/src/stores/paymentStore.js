@@ -88,6 +88,46 @@ export const usePaymentStore = defineStore('payments', {
       } finally {
         this.submitting = false;
       }
+    },
+
+    async updateRegistration(id, data) {
+      this.submitting = true;
+      try {
+        const response = await paymentService.updateRegistration(id, data);
+        return response;
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    async updateMonthlyPayment(id, data) {
+      this.submitting = true;
+      try {
+        const response = await paymentService.updateMonthlyPayment(id, data);
+        return response;
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    async deleteRegistration(id) {
+      this.submitting = true;
+      try {
+        const response = await paymentService.deleteRegistration(id);
+        return response;
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    async deleteMonthlyPayment(id) {
+      this.submitting = true;
+      try {
+        const response = await paymentService.deleteMonthlyPayment(id);
+        return response;
+      } finally {
+        this.submitting = false;
+      }
     }
   }
 });

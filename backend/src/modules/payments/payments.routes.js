@@ -16,9 +16,14 @@ router.get('/', PaymentsController.getAllPayments);
 
 // Inscripciones
 router.post('/registrations', PaymentsController.registerRegistration);
+router.put('/registration/:id', PaymentsController.updateRegistration);
+router.put('/registrations/:id', PaymentsController.updateRegistration);
+router.delete('/registration/:id', PaymentsController.deleteRegistration);
 
 // Mensualidades
 router.post('/monthly', PaymentsController.registerMonthlyPayment);
+router.put('/monthly/:id', PaymentsController.updateMonthlyPayment);
+router.delete('/monthly/:id', PaymentsController.deleteMonthlyPayment);
 
 // Estado financiero de alumno
 router.get('/student/:studentId/financial-status', PaymentsController.getStudentFinancialStatus);

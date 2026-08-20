@@ -6,6 +6,22 @@ const MONTH_NAMES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
+/**
+ * Normaliza la fecha de pago a mediodía UTC (T12:00:00.000Z) si es un string YYYY-MM-DD
+ * para evitar cualquier desfase por huso horario (UTC-5 Colombia).
+ */
+function parsePaymentDate(dateVal) {
+  if (!dateVal) return new Date();
+  if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
+    return new Date(`${dateVal}T12:00:00.000Z`);
+  }
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) {
+    throw new Error('La fecha de pago no es válida');
+  }
+  return d;
+}
+
 export class PaymentsService {
   /**
    * Obtener las tarifas configuradas desde la base de datos (AcademySetting)
@@ -61,7 +77,7 @@ export class PaymentsService {
         consecutive,
         studentId,
         amount: finalAmount,
-        paymentDate: data.paymentDate ? new Date(data.paymentDate) : new Date(),
+        paymentDate: parsePaymentDate(data.paymentDate),
         paymentMethod: data.paymentMethod || 'EFECTIVO',
         notes: data.notes || null,
         registeredBy: userName
@@ -80,6 +96,82 @@ export class PaymentsService {
     });
 
     return newRegistration;
+  }
+
+  /**
+   * Actualizar un pago de inscripción existente.
+   * Modifica fecha, valor, método y observaciones manteniendo intacto el consecutivo e inmutable el alumno.
+   */
+  static async updateRegistration(id, data, userName = 'Administrador') {
+    const regId = parseInt(id);
+    if (!regId || isNaN(regId)) {
+      throw new Error('ID de inscripción no válido');
+    }
+
+    const existingRegistration = await prisma.registration.findUnique({
+      where: { id: regId },
+      include: {
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            document: true,
+            category: { select: { name: true } }
+          }
+        }
+      }
+    });
+
+    if (!existingRegistration) {
+      throw new Error('El registro de inscripción especificado no existe');
+    }
+
+    // Validar monto si se especifica
+    let finalAmount = existingRegistration.amount;
+    if (data.amount !== undefined && data.amount !== null && data.amount !== '') {
+      const parsedAmount = parseFloat(data.amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        throw new Error('El valor del pago debe ser un número positivo mayor a 0');
+      }
+      finalAmount = parsedAmount;
+    }
+
+    // Validar fecha de pago si se especifica
+    let finalPaymentDate = existingRegistration.paymentDate;
+    if (data.paymentDate) {
+      finalPaymentDate = parsePaymentDate(data.paymentDate);
+    }
+
+    // Método de pago
+    const finalPaymentMethod = data.paymentMethod ? String(data.paymentMethod).toUpperCase() : existingRegistration.paymentMethod;
+
+    // Observaciones
+    const finalNotes = data.notes !== undefined ? (data.notes || null) : existingRegistration.notes;
+
+    // Actualizar en base de datos (consecutive, studentId, id permanecen inmutables)
+    const updatedRegistration = await prisma.registration.update({
+      where: { id: regId },
+      data: {
+        amount: finalAmount,
+        paymentDate: finalPaymentDate,
+        paymentMethod: finalPaymentMethod,
+        notes: finalNotes
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            document: true,
+            category: { select: { name: true } }
+          }
+        }
+      }
+    });
+
+    return updatedRegistration;
   }
 
   /**
@@ -168,6 +260,174 @@ export class PaymentsService {
   }
 
   /**
+   * Actualizar un pago de mensualidad existente.
+   * Modifica fecha, valor, método, mes, año y observaciones manteniendo intacto el consecutivo e inmutable el alumno.
+   */
+  static async updateMonthlyPayment(id, data, userName = 'Administrador') {
+    const paymentId = parseInt(id);
+    if (!paymentId || isNaN(paymentId)) {
+      throw new Error('ID de mensualidad no válido');
+    }
+
+    const existingMonthlyPayment = await prisma.monthlyPayment.findUnique({
+      where: { id: paymentId },
+      include: {
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            document: true,
+            category: { select: { name: true } }
+          }
+        }
+      }
+    });
+
+    if (!existingMonthlyPayment) {
+      throw new Error('El registro de mensualidad especificado no existe');
+    }
+
+    const studentId = existingMonthlyPayment.studentId;
+
+    // Validar mes y año si vienen en data
+    let finalMonth = existingMonthlyPayment.month;
+    if (data.month !== undefined && data.month !== null && data.month !== '') {
+      const parsedMonth = parseInt(data.month);
+      if (isNaN(parsedMonth) || parsedMonth < 1 || parsedMonth > 12) {
+        throw new Error('El mes debe ser un valor numérico entre 1 y 12');
+      }
+      finalMonth = parsedMonth;
+    }
+
+    let finalYear = existingMonthlyPayment.year;
+    if (data.year !== undefined && data.year !== null && data.year !== '') {
+      const parsedYear = parseInt(data.year);
+      if (isNaN(parsedYear) || parsedYear < 2000 || parsedYear > 2100) {
+        throw new Error('El año debe ser un valor numérico válido (ej. 2026)');
+      }
+      finalYear = parsedYear;
+    }
+
+    // Si cambió el mes o el año, verificar que no colisione con otro pago del mismo alumno
+    if (finalMonth !== existingMonthlyPayment.month || finalYear !== existingMonthlyPayment.year) {
+      const duplicatePayment = await prisma.monthlyPayment.findFirst({
+        where: {
+          studentId,
+          month: finalMonth,
+          year: finalYear,
+          NOT: { id: paymentId }
+        }
+      });
+
+      if (duplicatePayment) {
+        const monthName = MONTH_NAMES[finalMonth - 1];
+        throw new Error(`El alumno ya cuenta con un pago de mensualidad registrado para ${monthName} de ${finalYear} (${duplicatePayment.consecutive}).`);
+      }
+    }
+
+    // Validar monto
+    let finalAmount = existingMonthlyPayment.amount;
+    if (data.amount !== undefined && data.amount !== null && data.amount !== '') {
+      const parsedAmount = parseFloat(data.amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        throw new Error('El valor del pago debe ser un número positivo mayor a 0');
+      }
+      finalAmount = parsedAmount;
+    }
+
+    // Validar fecha de pago
+    let finalPaymentDate = existingMonthlyPayment.paymentDate;
+    if (data.paymentDate) {
+      const parsedDate = new Date(data.paymentDate);
+      if (isNaN(parsedDate.getTime())) {
+        throw new Error('La fecha de pago no es válida');
+      }
+      finalPaymentDate = parsedDate;
+    }
+
+    // Método de pago
+    const finalPaymentMethod = data.paymentMethod ? String(data.paymentMethod).toUpperCase() : existingMonthlyPayment.paymentMethod;
+
+    // Observaciones
+    const finalNotes = data.notes !== undefined ? (data.notes || null) : existingMonthlyPayment.notes;
+
+    // Actualizar en base de datos (consecutive, studentId, id permanecen inmutables)
+    const updatedMonthlyPayment = await prisma.monthlyPayment.update({
+      where: { id: paymentId },
+      data: {
+        month: finalMonth,
+        year: finalYear,
+        amount: finalAmount,
+        paymentDate: finalPaymentDate,
+        paymentMethod: finalPaymentMethod,
+        notes: finalNotes
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            document: true,
+            category: { select: { name: true } }
+          }
+        }
+      }
+    });
+
+    return updatedMonthlyPayment;
+  }
+
+  /**
+   * Eliminar físicamente un pago de inscripción.
+   */
+  static async deleteRegistration(id) {
+    const regId = parseInt(id);
+    if (!regId || isNaN(regId)) {
+      throw new Error('ID de inscripción no válido');
+    }
+
+    const existingRegistration = await prisma.registration.findUnique({
+      where: { id: regId }
+    });
+
+    if (!existingRegistration) {
+      throw new Error('El registro de inscripción especificado no existe');
+    }
+
+    await prisma.registration.delete({
+      where: { id: regId }
+    });
+
+    return { id: regId, deleted: true };
+  }
+
+  /**
+   * Eliminar físicamente un pago de mensualidad.
+   */
+  static async deleteMonthlyPayment(id) {
+    const paymentId = parseInt(id);
+    if (!paymentId || isNaN(paymentId)) {
+      throw new Error('ID de mensualidad no válido');
+    }
+
+    const existingMonthlyPayment = await prisma.monthlyPayment.findUnique({
+      where: { id: paymentId }
+    });
+
+    if (!existingMonthlyPayment) {
+      throw new Error('El registro de mensualidad especificado no existe');
+    }
+
+    await prisma.monthlyPayment.delete({
+      where: { id: paymentId }
+    });
+
+    return { id: paymentId, deleted: true };
+  }
+
+  /**
    * Obtener estado financiero completo de un alumno para el perfil
    */
   static async getStudentFinancialStatus(studentId, reqYear = null) {
@@ -213,16 +473,32 @@ export class PaymentsService {
       const payment = monthlyPaymentsMap.get(monthNum) || null;
       const isPaid = !!payment;
       
+      const entryDate = student.entryDate ? new Date(student.entryDate) : null;
+      const entryDay = entryDate ? entryDate.getUTCDate() : 1;
+
+      // Calcular etiqueta del periodo cubierto (ej. "15 jun - 14 jul")
+      const startDate = new Date(Date.UTC(targetYear, monthNum - 1, entryDay));
+      const endDate = new Date(Date.UTC(targetYear, monthNum, entryDay - 1));
+      const formatter = new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+      const periodLabel = `${formatter.format(startDate)} - ${formatter.format(endDate)}`;
+      
       // Determinar si el mes está vencido/pendiente
       let status = 'FUTURE';
       if (isPaid) {
         status = 'PAID';
       } else {
-        const entryDate = student.entryDate ? new Date(student.entryDate) : null;
         if (entryDate && (targetYear < entryDate.getFullYear() || (targetYear === entryDate.getFullYear() && monthNum < entryDate.getMonth() + 1))) {
           status = 'NOT_APPLICABLE';
-        } else if (targetYear < currentYear || (targetYear === currentYear && monthNum <= currentMonth)) {
+        } else if (targetYear < currentYear || (targetYear === currentYear && monthNum < currentMonth)) {
           status = 'PENDING';
+        } else if (targetYear === currentYear && monthNum === currentMonth) {
+          // El mes de cobro es el mes actual. Solo es PENDING si el día actual es mayor o igual al día de ingreso.
+          const currentDay = new Date().getDate();
+          if (currentDay >= entryDay) {
+            status = 'PENDING';
+          } else {
+            status = 'FUTURE';
+          }
         }
       }
 
@@ -230,6 +506,7 @@ export class PaymentsService {
         month: monthNum,
         monthName: MONTH_NAMES[index],
         year: targetYear,
+        periodLabel,
         isPaid,
         status,
         payment

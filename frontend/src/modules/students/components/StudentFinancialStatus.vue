@@ -126,7 +126,10 @@
             :class="['month-box', getMonthBoxClass(m)]"
           >
             <div class="month-top">
-              <span class="month-name">{{ m.monthName }}</span>
+              <div class="month-name-group">
+                <span class="month-name">{{ m.monthName }}</span>
+                <span class="month-period-label" v-if="m.periodLabel && m.status !== 'NOT_APPLICABLE'">{{ m.periodLabel }}</span>
+              </div>
               <span v-if="m.isPaid" class="month-badge paid">Pagado</span>
               <span v-else-if="m.status === 'PENDING'" class="month-badge pending">Pendiente</span>
               <span v-else-if="m.status === 'NOT_APPLICABLE'" class="month-badge na">Inactivo</span>
@@ -194,6 +197,7 @@
                 <th>Valor</th>
                 <th>Registrado Por</th>
                 <th>Observaciones</th>
+                <th class="text-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -212,6 +216,34 @@
                 <td class="font-bold text-dark">{{ formatCurrency(item.amount) }}</td>
                 <td class="text-sm text-gray">{{ item.registeredBy || 'Administrador' }}</td>
                 <td class="notes-cell">{{ item.notes || '-' }}</td>
+                <td class="action-cell">
+                  <div class="action-buttons-cell">
+                    <button
+                      type="button"
+                      class="btn-edit-action"
+                      title="Editar este pago"
+                      @click="openEditModal(item)"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                      </svg>
+                      <span>Editar</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn-delete-action"
+                      title="Eliminar este pago"
+                      @click="handleDeletePayment(item)"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 6h18"></path>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                      <span>Eliminar</span>
+                    </button>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -235,6 +267,14 @@
       @close="showMonthlyModal = false"
       @success="handlePaymentSuccess"
     />
+
+    <!-- MODAL DE EDICIÓN DE PAGO -->
+    <EditPaymentModal
+      :show="showEditModal"
+      :payment="selectedPaymentToEdit"
+      @close="showEditModal = false"
+      @success="handlePaymentSuccess"
+    />
   </div>
 </template>
 
@@ -243,6 +283,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { usePaymentStore } from '../../../stores/paymentStore';
 import RegistrationModal from '../../payments/components/RegistrationModal.vue';
 import MonthlyPaymentModal from '../../payments/components/MonthlyPaymentModal.vue';
+import EditPaymentModal from '../../payments/components/EditPaymentModal.vue';
 
 const props = defineProps({
   student: {
@@ -261,6 +302,8 @@ const availableYears = [currentYear - 1, currentYear, currentYear + 1];
 
 const showRegistrationModal = ref(false);
 const showMonthlyModal = ref(false);
+const showEditModal = ref(false);
+const selectedPaymentToEdit = ref(null);
 const selectedMonthForModal = ref(null);
 const selectedYearForModal = ref(currentYear);
 
@@ -291,6 +334,33 @@ const openMonthlyModal = (month = null, year = selectedYear.value) => {
   showMonthlyModal.value = true;
 };
 
+const openEditModal = (payment) => {
+  selectedPaymentToEdit.value = {
+    ...payment,
+    studentId: props.student.id,
+    studentName: `${props.student.firstName} ${props.student.lastName}`,
+    studentDocument: props.student.document
+  };
+  showEditModal.value = true;
+};
+
+const handleDeletePayment = async (payment) => {
+  if (!confirm(`¿Estás seguro de que deseas eliminar este pago (${payment.consecutive})?\nEsta acción no se puede deshacer.`)) {
+    return;
+  }
+  
+  try {
+    if (payment.type === 'INSCRIPCION') {
+      await paymentStore.deleteRegistration(payment.id);
+    } else {
+      await paymentStore.deleteMonthlyPayment(payment.id);
+    }
+    loadFinancialStatus();
+  } catch (error) {
+    alert(error.message || 'Ocurrió un error al intentar eliminar el pago');
+  }
+};
+
 const handlePaymentSuccess = () => {
   loadFinancialStatus();
 };
@@ -318,7 +388,8 @@ const formatDate = (dateString) => {
   return new Intl.DateTimeFormat('es-CO', {
     day: '2-digit',
     month: 'short',
-    year: 'numeric'
+    year: 'numeric',
+    timeZone: 'UTC'
   }).format(d);
 };
 
@@ -326,7 +397,7 @@ const formatDateShort = (dateString) => {
   if (!dateString) return '';
   const d = new Date(dateString);
   if (isNaN(d.getTime())) return '';
-  return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+  return `${d.getUTCDate()}/${d.getUTCMonth() + 1}/${d.getUTCFullYear()}`;
 };
 
 const formatMethod = (method) => {
@@ -606,13 +677,25 @@ const formatMethod = (method) => {
 .month-top {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+}
+
+.month-name-group {
+  display: flex;
+  flex-direction: column;
 }
 
 .month-name {
   font-weight: 700;
   font-size: 0.92rem;
   color: var(--color-dark);
+}
+
+.month-period-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-gray-500);
+  margin-top: 2px;
 }
 
 .month-badge {
@@ -765,5 +848,63 @@ const formatMethod = (method) => {
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--color-gray-500);
+}
+
+.action-cell {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.btn-edit-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #2563eb;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-edit-action:hover {
+  background-color: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
+
+.action-buttons-cell {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.btn-delete-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #dc2626;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-delete-action:hover {
+  background-color: #dc2626;
+  color: #ffffff;
+  border-color: #dc2626;
 }
 </style>

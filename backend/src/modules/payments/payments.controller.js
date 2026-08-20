@@ -77,6 +77,88 @@ export class PaymentsController {
   }
 
   /**
+   * Actualizar pago de inscripción
+   */
+  static async updateRegistration(req, res, next) {
+    try {
+      const { id } = req.params;
+      const userName = req.user?.name || 'Administrador';
+      const registration = await PaymentsService.updateRegistration(id, req.body, userName);
+      return res.json({
+        success: true,
+        message: 'Pago de inscripción actualizado exitosamente',
+        data: registration
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  /**
+   * Actualizar pago de mensualidad
+   */
+  static async updateMonthlyPayment(req, res, next) {
+    try {
+      const { id } = req.params;
+      const userName = req.user?.name || 'Administrador';
+      const monthlyPayment = await PaymentsService.updateMonthlyPayment(id, req.body, userName);
+      return res.json({
+        success: true,
+        message: 'Pago de mensualidad actualizado exitosamente',
+        data: monthlyPayment
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  /**
+   * Eliminar un pago de inscripción
+   */
+  static async deleteRegistration(req, res, next) {
+    try {
+      const { id } = req.params;
+      const result = await PaymentsService.deleteRegistration(id);
+      return res.json({
+        success: true,
+        message: 'Pago de inscripción eliminado exitosamente',
+        data: result
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  /**
+   * Eliminar un pago de mensualidad
+   */
+  static async deleteMonthlyPayment(req, res, next) {
+    try {
+      const { id } = req.params;
+      const result = await PaymentsService.deleteMonthlyPayment(id);
+      return res.json({
+        success: true,
+        message: 'Pago de mensualidad eliminado exitosamente',
+        data: result
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  /**
    * Listar todos los pagos con filtros
    */
   static async getAllPayments(req, res, next) {

@@ -36,10 +36,42 @@ export default {
   },
 
   /**
+   * Actualizar un pago de inscripción
+   */
+  async updateRegistration(id, data) {
+    const response = await api.put(`/payments/registration/${id}`, data);
+    return response.data;
+  },
+
+  /**
+   * Actualizar un pago de mensualidad
+   */
+  async updateMonthlyPayment(id, data) {
+    const response = await api.put(`/payments/monthly/${id}`, data);
+    return response.data;
+  },
+
+  /**
    * Listar todos los pagos con filtros opcionales
    */
   async getAllPayments(params = {}) {
     const response = await api.get('/payments/all', { params });
+    return response.data;
+  },
+
+  /**
+   * Eliminar un pago de inscripción
+   */
+  async deleteRegistration(id) {
+    const response = await api.delete(`/payments/registration/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Eliminar un pago de mensualidad
+   */
+  async deleteMonthlyPayment(id) {
+    const response = await api.delete(`/payments/monthly/${id}`);
     return response.data;
   }
 };
