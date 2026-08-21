@@ -22,6 +22,18 @@ function parsePaymentDate(dateVal) {
   return d;
 }
 
+/**
+ * Extrae el ID numérico eliminando prefijos opcionales (ej. REG-15 o MEN-28 -> 15 o 28)
+ */
+function parseId(id) {
+  if (id === undefined || id === null) return NaN;
+  if (typeof id === 'string') {
+    const cleaned = id.replace(/^(REG|MEN)-/i, '');
+    return parseInt(cleaned, 10);
+  }
+  return parseInt(id, 10);
+}
+
 export class PaymentsService {
   /**
    * Obtener las tarifas configuradas desde la base de datos (AcademySetting)
@@ -103,7 +115,7 @@ export class PaymentsService {
    * Modifica fecha, valor, método y observaciones manteniendo intacto el consecutivo e inmutable el alumno.
    */
   static async updateRegistration(id, data, userName = 'Administrador') {
-    const regId = parseInt(id);
+    const regId = parseId(id);
     if (!regId || isNaN(regId)) {
       throw new Error('ID de inscripción no válido');
     }
@@ -264,7 +276,7 @@ export class PaymentsService {
    * Modifica fecha, valor, método, mes, año y observaciones manteniendo intacto el consecutivo e inmutable el alumno.
    */
   static async updateMonthlyPayment(id, data, userName = 'Administrador') {
-    const paymentId = parseInt(id);
+    const paymentId = parseId(id);
     if (!paymentId || isNaN(paymentId)) {
       throw new Error('ID de mensualidad no válido');
     }
@@ -383,7 +395,7 @@ export class PaymentsService {
    * Eliminar físicamente un pago de inscripción.
    */
   static async deleteRegistration(id) {
-    const regId = parseInt(id);
+    const regId = parseId(id);
     if (!regId || isNaN(regId)) {
       throw new Error('ID de inscripción no válido');
     }
@@ -407,7 +419,7 @@ export class PaymentsService {
    * Eliminar físicamente un pago de mensualidad.
    */
   static async deleteMonthlyPayment(id) {
-    const paymentId = parseInt(id);
+    const paymentId = parseId(id);
     if (!paymentId || isNaN(paymentId)) {
       throw new Error('ID de mensualidad no válido');
     }

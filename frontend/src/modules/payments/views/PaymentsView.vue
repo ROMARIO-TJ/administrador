@@ -309,14 +309,15 @@ const handleDeletePayment = async (payment) => {
   }
   
   try {
+    const targetId = payment.rawId || payment.id;
     if (payment.type === 'INSCRIPCION') {
-      await paymentStore.deleteRegistration(payment.id);
+      await paymentStore.deleteRegistration(targetId);
     } else {
-      await paymentStore.deleteMonthlyPayment(payment.id);
+      await paymentStore.deleteMonthlyPayment(targetId);
     }
     await handlePaymentSuccess();
   } catch (error) {
-    alert(error.message || 'Ocurrió un error al intentar eliminar el pago');
+    alert(error.response?.data?.message || error.message || 'Ocurrió un error al intentar eliminar el pago');
   }
 };
 
