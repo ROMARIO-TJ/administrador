@@ -36,6 +36,16 @@ export default {
   },
 
   /**
+   * Obtener la recomendación de ciclo para un alumno
+   */
+  async getRecommendedCycle(studentId, targetDate) {
+    const response = await api.get(`/payments/student/${studentId}/recommended-cycle`, {
+      params: { targetDate }
+    });
+    return response.data;
+  },
+
+  /**
    * Actualizar un pago de inscripción
    */
   async updateRegistration(id, data) {

@@ -53,7 +53,18 @@
             <span>El consecutivo, el alumno y el tipo de pago permanecen inalterados para preservar la integridad contable.</span>
           </div>
 
-          <!-- SI ES MENSUALIDAD: MES Y AÑO -->
+          <!-- SI ES MENSUALIDAD: CICLO DE COBERTURA Y MES/AÑO -->
+          <div class="form-row-2" v-if="isMonthly">
+            <div class="form-group">
+              <label class="form-label">Inicio del Ciclo <span class="required">*</span></label>
+              <input type="date" v-model="form.cycleStartDate" class="form-control" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fin del Ciclo <span class="required">*</span></label>
+              <input type="date" v-model="form.cycleEndDate" class="form-control" required />
+            </div>
+          </div>
+
           <div class="form-row-2" v-if="isMonthly">
             <div class="form-group">
               <label class="form-label">Mes Correspondiente <span class="required">*</span></label>
@@ -283,6 +294,8 @@ const originalData = reactive({
   paymentMethod: 'EFECTIVO',
   month: null,
   year: null,
+  cycleStartDate: '',
+  cycleEndDate: '',
   notes: ''
 });
 
@@ -293,6 +306,8 @@ const form = reactive({
   paymentMethod: 'EFECTIVO',
   month: 1,
   year: currentY,
+  cycleStartDate: '',
+  cycleEndDate: '',
   notes: ''
 });
 
@@ -380,6 +395,8 @@ const loadPaymentData = () => {
   originalData.paymentMethod = (p.paymentMethod || 'EFECTIVO').toUpperCase();
   originalData.month = p.month || null;
   originalData.year = p.year || (p.paymentDate ? new Date(p.paymentDate).getUTCFullYear() : currentY);
+  originalData.cycleStartDate = p.cycleStartDate ? formatIsoDate(p.cycleStartDate) : '';
+  originalData.cycleEndDate = p.cycleEndDate ? formatIsoDate(p.cycleEndDate) : '';
   originalData.notes = p.notes || '';
 
   // Inicializar formulario
@@ -388,6 +405,8 @@ const loadPaymentData = () => {
   form.paymentMethod = originalData.paymentMethod;
   form.month = originalData.month || (new Date().getMonth() + 1);
   form.year = originalData.year || currentY;
+  form.cycleStartDate = originalData.cycleStartDate;
+  form.cycleEndDate = originalData.cycleEndDate;
   form.notes = originalData.notes;
 };
 
@@ -437,6 +456,8 @@ const handleConfirmSave = async () => {
       const payload = {
         month: form.month,
         year: form.year,
+        cycleStartDate: form.cycleStartDate,
+        cycleEndDate: form.cycleEndDate,
         amount: form.amount,
         paymentDate: form.paymentDate,
         paymentMethod: form.paymentMethod,

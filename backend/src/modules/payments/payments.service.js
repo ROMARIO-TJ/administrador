@@ -1,5 +1,13 @@
 import prisma from '../../config/db.js';
 import { getNextConsecutive } from '../../utils/consecutive.js';
+import {
+  parseUtcDate,
+  formatIsoDate,
+  calculateCycleEndDate,
+  inferHistoricalCycle,
+  getRecommendedCycle,
+  formatPeriodLabel
+} from '../../utils/cycleUtils.js';
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -187,47 +195,54 @@ export class PaymentsService {
   }
 
   /**
+  /**
    * Registrar pago de mensualidad para un alumno.
-   * Un alumno no puede pagar dos veces el mismo mes del mismo año.
+   * Manejado por Ciclos de Cobertura dinámicos.
    */
   static async registerMonthlyPayment(data, userName = 'Administrador') {
     const studentId = parseInt(data.studentId);
-    const month = parseInt(data.month);
-    const year = parseInt(data.year);
 
     if (!studentId || isNaN(studentId)) {
       throw new Error('ID de alumno no válido');
     }
-    if (!month || month < 1 || month > 12) {
-      throw new Error('El mes debe ser un valor numérico entre 1 y 12');
-    }
-    if (!year || year < 2000 || year > 2100) {
-      throw new Error('Año no válido');
-    }
 
-    // Verificar existencia del alumno
+    // Verificar existencia del alumno con sus pagos previos de mensualidad
     const student = await prisma.student.findUnique({
-      where: { id: studentId }
+      where: { id: studentId },
+      include: {
+        monthlyPayments: {
+          orderBy: { paymentDate: 'desc' }
+        }
+      }
     });
 
     if (!student) {
       throw new Error('El alumno especificado no existe');
     }
 
-    // Verificar duplicado mes + año para el mismo alumno
-    const existingMonthlyPayment = await prisma.monthlyPayment.findUnique({
-      where: {
-        studentId_month_year: {
-          studentId,
-          month,
-          year
-        }
-      }
-    });
+    const paymentDate = data.paymentDate ? parseUtcDate(data.paymentDate) : parseUtcDate(new Date());
 
-    if (existingMonthlyPayment) {
-      const monthName = MONTH_NAMES[month - 1];
-      throw new Error(`El alumno ${student.firstName} ${student.lastName} ya registró la mensualidad de ${monthName} de ${year} (${existingMonthlyPayment.consecutive}).`);
+    // Determinar fechas de inicio y fin de ciclo
+    let cycleStartDate;
+    let cycleEndDate;
+
+    if (data.cycleStartDate) {
+      cycleStartDate = parseUtcDate(data.cycleStartDate);
+      cycleEndDate = data.cycleEndDate ? parseUtcDate(data.cycleEndDate) : calculateCycleEndDate(cycleStartDate);
+    } else {
+      const rec = getRecommendedCycle(student, student.monthlyPayments, paymentDate);
+      cycleStartDate = rec.recommendedStartDate;
+      cycleEndDate = rec.recommendedEndDate;
+    }
+
+    const month = data.month ? parseInt(data.month) : (cycleStartDate.getUTCMonth() + 1);
+    const year = data.year ? parseInt(data.year) : cycleStartDate.getUTCFullYear();
+
+    if (!month || month < 1 || month > 12) {
+      throw new Error('El mes debe ser un valor numérico entre 1 y 12');
+    }
+    if (!year || year < 2000 || year > 2100) {
+      throw new Error('Año no válido');
     }
 
     // Obtener tarifa sugerida: si el alumno tiene tarifa personalizada usarla, sino leer de AcademySetting
@@ -249,8 +264,10 @@ export class PaymentsService {
         studentId,
         month,
         year,
+        cycleStartDate,
+        cycleEndDate,
         amount: finalAmount,
-        paymentDate: data.paymentDate ? new Date(data.paymentDate) : new Date(),
+        paymentDate,
         paymentMethod: data.paymentMethod || 'EFECTIVO',
         notes: data.notes || null,
         registeredBy: userName
@@ -272,8 +289,33 @@ export class PaymentsService {
   }
 
   /**
+   * Obtener recomendación de ciclo para un nuevo pago
+   */
+  static async getRecommendedPaymentCycle(studentId, targetDate = null) {
+    const id = parseInt(studentId);
+    if (!id || isNaN(id)) {
+      throw new Error('ID de alumno no válido');
+    }
+
+    const student = await prisma.student.findUnique({
+      where: { id },
+      include: {
+        monthlyPayments: {
+          orderBy: { paymentDate: 'desc' }
+        }
+      }
+    });
+
+    if (!student) {
+      throw new Error('El alumno especificado no existe');
+    }
+
+    return getRecommendedCycle(student, student.monthlyPayments, targetDate);
+  }
+
+  /**
    * Actualizar un pago de mensualidad existente.
-   * Modifica fecha, valor, método, mes, año y observaciones manteniendo intacto el consecutivo e inmutable el alumno.
+   * Modifica fecha, valor, método, mes, año, ciclo y observaciones manteniendo intacto el consecutivo e inmutable el alumno.
    */
   static async updateMonthlyPayment(id, data, userName = 'Administrador') {
     const paymentId = parseId(id);
@@ -290,6 +332,7 @@ export class PaymentsService {
             firstName: true,
             lastName: true,
             document: true,
+            entryDate: true,
             category: { select: { name: true } }
           }
         }
@@ -300,62 +343,37 @@ export class PaymentsService {
       throw new Error('El registro de mensualidad especificado no existe');
     }
 
-    const studentId = existingMonthlyPayment.studentId;
-
-    // Validar mes y año si vienen en data
-    let finalMonth = existingMonthlyPayment.month;
-    if (data.month !== undefined && data.month !== null && data.month !== '') {
-      const parsedMonth = parseInt(data.month);
-      if (isNaN(parsedMonth) || parsedMonth < 1 || parsedMonth > 12) {
-        throw new Error('El mes debe ser un valor numérico entre 1 y 12');
-      }
-      finalMonth = parsedMonth;
+    let finalPaymentDate = existingMonthlyPayment.paymentDate;
+    if (data.paymentDate) {
+      finalPaymentDate = parseUtcDate(data.paymentDate);
     }
 
-    let finalYear = existingMonthlyPayment.year;
-    if (data.year !== undefined && data.year !== null && data.year !== '') {
-      const parsedYear = parseInt(data.year);
-      if (isNaN(parsedYear) || parsedYear < 2000 || parsedYear > 2100) {
-        throw new Error('El año debe ser un valor numérico válido (ej. 2026)');
-      }
-      finalYear = parsedYear;
+    let cycleStartDate = existingMonthlyPayment.cycleStartDate;
+    let cycleEndDate = existingMonthlyPayment.cycleEndDate;
+
+    if (data.cycleStartDate) {
+      cycleStartDate = parseUtcDate(data.cycleStartDate);
+      cycleEndDate = data.cycleEndDate ? parseUtcDate(data.cycleEndDate) : calculateCycleEndDate(cycleStartDate);
+    } else if (!cycleStartDate || data.paymentDate || data.month || data.year) {
+      const targetMonth = data.month ? parseInt(data.month) : existingMonthlyPayment.month;
+      const targetYear = data.year ? parseInt(data.year) : existingMonthlyPayment.year;
+      const entryDate = existingMonthlyPayment.student.entryDate ? parseUtcDate(existingMonthlyPayment.student.entryDate) : finalPaymentDate;
+      const entryDay = entryDate.getUTCDate();
+      cycleStartDate = new Date(Date.UTC(targetYear, targetMonth - 1, entryDay, 12, 0, 0, 0));
+      cycleEndDate = calculateCycleEndDate(cycleStartDate);
     }
 
-    // Si cambió el mes o el año, verificar que no colisione con otro pago del mismo alumno
-    if (finalMonth !== existingMonthlyPayment.month || finalYear !== existingMonthlyPayment.year) {
-      const duplicatePayment = await prisma.monthlyPayment.findFirst({
-        where: {
-          studentId,
-          month: finalMonth,
-          year: finalYear,
-          NOT: { id: paymentId }
-        }
-      });
-
-      if (duplicatePayment) {
-        const monthName = MONTH_NAMES[finalMonth - 1];
-        throw new Error(`El alumno ya cuenta con un pago de mensualidad registrado para ${monthName} de ${finalYear} (${duplicatePayment.consecutive}).`);
-      }
-    }
+    let finalMonth = data.month ? parseInt(data.month) : (cycleStartDate ? cycleStartDate.getUTCMonth() + 1 : existingMonthlyPayment.month);
+    let finalYear = data.year ? parseInt(data.year) : (cycleStartDate ? cycleStartDate.getUTCFullYear() : existingMonthlyPayment.year);
 
     // Validar monto
     let finalAmount = existingMonthlyPayment.amount;
     if (data.amount !== undefined && data.amount !== null && data.amount !== '') {
       const parsedAmount = parseFloat(data.amount);
-      if (isNaN(parsedAmount) || parsedAmount <= 0) {
-        throw new Error('El valor del pago debe ser un número positivo mayor a 0');
+      if (isNaN(parsedAmount) || parsedAmount < 0) {
+        throw new Error('El valor del pago debe ser un número positivo mayor o igual a 0');
       }
       finalAmount = parsedAmount;
-    }
-
-    // Validar fecha de pago
-    let finalPaymentDate = existingMonthlyPayment.paymentDate;
-    if (data.paymentDate) {
-      const parsedDate = new Date(data.paymentDate);
-      if (isNaN(parsedDate.getTime())) {
-        throw new Error('La fecha de pago no es válida');
-      }
-      finalPaymentDate = parsedDate;
     }
 
     // Método de pago
@@ -370,6 +388,8 @@ export class PaymentsService {
       data: {
         month: finalMonth,
         year: finalYear,
+        cycleStartDate,
+        cycleEndDate,
         amount: finalAmount,
         paymentDate: finalPaymentDate,
         paymentMethod: finalPaymentMethod,
@@ -469,44 +489,62 @@ export class PaymentsService {
       details: student.registration || null
     };
 
-    // Mensualidades del año seleccionado
+    // Procesar todos los pagos con su ciclo inferido o guardado
+    const processedPayments = student.monthlyPayments.map(p => {
+      const { cycleStartDate, cycleEndDate } = inferHistoricalCycle(p, student.entryDate);
+      const periodLabel = formatPeriodLabel(cycleStartDate, cycleEndDate);
+      return {
+        ...p,
+        cycleStartDate,
+        cycleEndDate,
+        periodLabel
+      };
+    });
+
+    // Mapear por mes del targetYear
     const monthlyPaymentsMap = new Map();
-    student.monthlyPayments.forEach(p => {
-      if (p.year === targetYear) {
-        monthlyPaymentsMap.set(p.month, p);
+    processedPayments.forEach(p => {
+      const year = p.cycleStartDate ? p.cycleStartDate.getUTCFullYear() : p.year;
+      const month = p.cycleStartDate ? (p.cycleStartDate.getUTCMonth() + 1) : p.month;
+      if (year === targetYear) {
+        monthlyPaymentsMap.set(month, p);
       }
     });
 
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1; // 1-12
+    const today = parseUtcDate(new Date());
 
     const yearMonthlyGrid = Array.from({ length: 12 }, (_, index) => {
       const monthNum = index + 1;
       const payment = monthlyPaymentsMap.get(monthNum) || null;
       const isPaid = !!payment;
       
-      const entryDate = student.entryDate ? new Date(student.entryDate) : null;
-      const entryDay = entryDate ? entryDate.getUTCDate() : 1;
+      const entryDate = student.entryDate ? parseUtcDate(student.entryDate) : null;
 
-      // Calcular etiqueta del periodo cubierto (ej. "15 jun - 14 jul")
-      const startDate = new Date(Date.UTC(targetYear, monthNum - 1, entryDay));
-      const endDate = new Date(Date.UTC(targetYear, monthNum, entryDay - 1));
-      const formatter = new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-      const periodLabel = `${formatter.format(startDate)} - ${formatter.format(endDate)}`;
+      let cycleStartDate = payment ? payment.cycleStartDate : null;
+      let cycleEndDate = payment ? payment.cycleEndDate : null;
+      let periodLabel = payment ? payment.periodLabel : '';
+
+      if (!payment) {
+        const entryDay = entryDate ? entryDate.getUTCDate() : 1;
+        const gridStartDate = new Date(Date.UTC(targetYear, monthNum - 1, entryDay, 12, 0, 0, 0));
+        cycleStartDate = gridStartDate;
+        cycleEndDate = calculateCycleEndDate(gridStartDate);
+        periodLabel = formatPeriodLabel(cycleStartDate, cycleEndDate);
+      }
       
       // Determinar si el mes está vencido/pendiente
       let status = 'FUTURE';
       if (isPaid) {
         status = 'PAID';
       } else {
-        if (entryDate && (targetYear < entryDate.getFullYear() || (targetYear === entryDate.getFullYear() && monthNum < entryDate.getMonth() + 1))) {
+        if (entryDate && (targetYear < entryDate.getUTCFullYear() || (targetYear === entryDate.getUTCFullYear() && monthNum < entryDate.getUTCMonth() + 1))) {
           status = 'NOT_APPLICABLE';
         } else if (targetYear < currentYear || (targetYear === currentYear && monthNum < currentMonth)) {
           status = 'PENDING';
         } else if (targetYear === currentYear && monthNum === currentMonth) {
-          // El mes de cobro es el mes actual. Solo es PENDING si el día actual es mayor o igual al día de ingreso.
-          const currentDay = new Date().getDate();
-          if (currentDay >= entryDay) {
+          if (today.getTime() >= cycleStartDate.getTime()) {
             status = 'PENDING';
           } else {
             status = 'FUTURE';
@@ -518,6 +556,8 @@ export class PaymentsService {
         month: monthNum,
         monthName: MONTH_NAMES[index],
         year: targetYear,
+        cycleStartDate,
+        cycleEndDate,
         periodLabel,
         isPaid,
         status,
@@ -542,7 +582,7 @@ export class PaymentsService {
       });
     }
 
-    student.monthlyPayments.forEach(p => {
+    processedPayments.forEach(p => {
       history.push({
         id: `MEN-${p.id}`,
         type: 'MENSUALIDAD',
@@ -551,6 +591,9 @@ export class PaymentsService {
         amount: p.amount,
         month: p.month,
         year: p.year,
+        cycleStartDate: p.cycleStartDate,
+        cycleEndDate: p.cycleEndDate,
+        periodLabel: p.periodLabel,
         paymentDate: p.paymentDate,
         paymentMethod: p.paymentMethod,
         notes: p.notes,
@@ -566,18 +609,27 @@ export class PaymentsService {
     const totalPaidMensualidades = student.monthlyPayments.reduce((sum, p) => sum + p.amount, 0);
     const totalPaid = totalPaidInscripciones + totalPaidMensualidades;
 
-    // Cálculo de saldo pendiente
+    // Cálculo de saldo pendiente basado en la vigencia del último ciclo pagado
     let pendingBalance = 0;
     if (!student.registration) {
       pendingBalance += defaultFees.registrationFee;
     }
 
-    // Sumar mensualidades no pagadas hasta el mes actual del año en curso
-    yearMonthlyGrid.forEach(m => {
-      if (m.status === 'PENDING') {
-        pendingBalance += effectiveMonthlyFee;
+    const sortedPayments = [...processedPayments].sort((a, b) => b.cycleEndDate.getTime() - a.cycleEndDate.getTime());
+    const lastPaidCycleEnd = sortedPayments.length > 0 ? sortedPayments[0].cycleEndDate : null;
+
+    if (student.status === 'ACTIVE') {
+      if (!lastPaidCycleEnd) {
+        const entryDate = student.entryDate ? parseUtcDate(student.entryDate) : today;
+        if (today.getTime() >= entryDate.getTime()) {
+          pendingBalance += effectiveMonthlyFee;
+        }
+      } else {
+        if (today.getTime() > lastPaidCycleEnd.getTime()) {
+          pendingBalance += effectiveMonthlyFee;
+        }
       }
-    });
+    }
 
     return {
       studentId: student.id,
@@ -594,7 +646,8 @@ export class PaymentsService {
       totalPaid,
       totalPaidInscripciones,
       totalPaidMensualidades,
-      pendingBalance
+      pendingBalance,
+      lastPaidCycleEnd
     };
   }
 
@@ -701,23 +754,30 @@ export class PaymentsService {
       registeredBy: r.registeredBy
     }));
 
-    const formattedMonthly = monthlyPayments.map(m => ({
-      id: `MEN-${m.id}`,
-      rawId: m.id,
-      type: 'MENSUALIDAD',
-      concept: `Mensualidad (${MONTH_NAMES[m.month - 1]} ${m.year})`,
-      consecutive: m.consecutive,
-      studentId: m.studentId,
-      studentName: m.student ? `${m.student.firstName} ${m.student.lastName}` : 'N/A',
-      studentDocument: m.student ? m.student.document : 'N/A',
-      categoryName: m.student?.category?.name || 'N/A',
-      amount: m.amount,
-      period: `${MONTH_NAMES[m.month - 1]} ${m.year}`,
-      paymentDate: m.paymentDate,
-      paymentMethod: m.paymentMethod,
-      notes: m.notes,
-      registeredBy: m.registeredBy
-    }));
+    const formattedMonthly = monthlyPayments.map(m => {
+      const { cycleStartDate, cycleEndDate } = inferHistoricalCycle(m, m.student?.entryDate);
+      const periodLabel = formatPeriodLabel(cycleStartDate, cycleEndDate);
+      return {
+        id: `MEN-${m.id}`,
+        rawId: m.id,
+        type: 'MENSUALIDAD',
+        concept: `Mensualidad (${MONTH_NAMES[m.month - 1]} ${m.year})`,
+        consecutive: m.consecutive,
+        studentId: m.studentId,
+        studentName: m.student ? `${m.student.firstName} ${m.student.lastName}` : 'N/A',
+        studentDocument: m.student ? m.student.document : 'N/A',
+        categoryName: m.student?.category?.name || 'N/A',
+        amount: m.amount,
+        period: periodLabel ? `${MONTH_NAMES[m.month - 1]} ${m.year} (${periodLabel})` : `${MONTH_NAMES[m.month - 1]} ${m.year}`,
+        cycleStartDate,
+        cycleEndDate,
+        periodLabel,
+        paymentDate: m.paymentDate,
+        paymentMethod: m.paymentMethod,
+        notes: m.notes,
+        registeredBy: m.registeredBy
+      };
+    });
 
     const allPayments = [...formattedRegistrations, ...formattedMonthly];
     allPayments.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate));

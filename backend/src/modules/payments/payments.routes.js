@@ -25,7 +25,8 @@ router.post('/monthly', PaymentsController.registerMonthlyPayment);
 router.put('/monthly/:id', PaymentsController.updateMonthlyPayment);
 router.delete('/monthly/:id', PaymentsController.deleteMonthlyPayment);
 
-// Estado financiero de alumno
+// Estado financiero y recomendación de ciclo de alumno
 router.get('/student/:studentId/financial-status', PaymentsController.getStudentFinancialStatus);
+router.get('/student/:studentId/recommended-cycle', PaymentsController.getRecommendedPaymentCycle);
 
 export default router;

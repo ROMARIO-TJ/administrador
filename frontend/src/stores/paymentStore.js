@@ -70,6 +70,16 @@ export const usePaymentStore = defineStore('payments', {
       }
     },
 
+    async fetchRecommendedCycle(studentId, targetDate) {
+      try {
+        const response = await paymentService.getRecommendedCycle(studentId, targetDate);
+        return response;
+      } catch (err) {
+        console.error('Error fetching recommended cycle:', err);
+        return null;
+      }
+    },
+
     async registerRegistration(data) {
       this.submitting = true;
       try {

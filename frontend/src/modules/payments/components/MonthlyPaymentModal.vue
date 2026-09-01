@@ -14,7 +14,7 @@
             </div>
             <div>
               <h3>Registrar Pago de Mensualidad</h3>
-              <p class="subtext">Abono o mensualidad periódica del alumno</p>
+              <p class="subtext">Abono o mensualidad periódica por ciclo de cobertura</p>
             </div>
           </div>
           <button type="button" class="close-btn" @click="close">&times;</button>
@@ -36,17 +36,48 @@
             </select>
           </div>
 
-          <!-- Alumno Fijo (Si ya está seleccionado) -->
+          <!-- Alumno Fijo -->
           <div class="student-info-badge" v-else>
             <span class="label">Alumno:</span>
             <strong>{{ student.firstName }} {{ student.lastName }}</strong>
             <span class="doc">Doc: {{ student.document }}</span>
           </div>
 
+          <!-- Alerta de Interrupción o Sugerencia de Ciclo -->
+          <div v-if="cycleRecommendation && cycleRecommendation.hasInterruption" class="alert alert-warning-interruption">
+            <div class="alert-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+            </div>
+            <div>
+              <strong>Se detectó una interrupción de asistencia</strong>
+              <p>El periodo del {{ formatDateShort(cycleRecommendation.interruptionFrom) }} al {{ formatDateShort(cycleRecommendation.interruptionTo) }} no generó deuda.</p>
+              <span class="cycle-tag">Nuevo ciclo sugerido: {{ formatDateShort(cycleRecommendation.recommendedStartDate) }} → {{ formatDateShort(cycleRecommendation.recommendedEndDate) }}</span>
+            </div>
+          </div>
+          <div v-else-if="cycleRecommendation && cycleRecommendation.recommendedStartDate" class="alert alert-info-cycle">
+            <span class="cycle-tag font-bold">Ciclo sugerido: {{ formatDateShort(cycleRecommendation.recommendedStartDate) }} → {{ formatDateShort(cycleRecommendation.recommendedEndDate) }}</span>
+          </div>
+
+          <!-- Fechas de Inicio y Fin de Ciclo de Cobertura -->
           <div class="form-row-2">
-            <!-- Selección de Mes -->
             <div class="form-group">
-              <label class="form-label">Mes a Pagar <span class="required">*</span></label>
+              <label class="form-label">Inicio del Ciclo <span class="required">*</span></label>
+              <input type="date" v-model="form.cycleStartDate" class="form-control" required @change="onCycleStartDateChange" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fin del Ciclo <span class="required">*</span></label>
+              <input type="date" v-model="form.cycleEndDate" class="form-control" required />
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <!-- Selección de Mes Referencial -->
+            <div class="form-group">
+              <label class="form-label">Mes Referencial <span class="required">*</span></label>
               <select v-model.number="form.month" class="form-control" required>
                 <option v-for="(mName, idx) in monthsList" :key="idx + 1" :value="idx + 1">
                   {{ mName }}
@@ -54,7 +85,7 @@
               </select>
             </div>
 
-            <!-- Selección de Año -->
+            <!-- Selección de Año Referencial -->
             <div class="form-group">
               <label class="form-label">Año <span class="required">*</span></label>
               <select v-model.number="form.year" class="form-control" required>
@@ -69,7 +100,7 @@
           <div class="form-group checkbox-group">
             <label class="checkbox-label">
               <input type="checkbox" v-model="form.isExempt" @change="onExemptChange" />
-              <span>Exonerar cobro por inasistencia (No se cobrará este mes)</span>
+              <span>Exonerar cobro por inasistencia (Sin costo)</span>
             </label>
           </div>
 
@@ -90,7 +121,7 @@
               />
             </div>
             <small class="hint-text">
-              Tarifa mensual sugerida. Se lee dinámicamente según las reglas del sistema o tarifa del alumno.
+              Tarifa mensual sugerida para este ciclo.
             </small>
           </div>
 
@@ -98,7 +129,7 @@
             <!-- Fecha de Pago -->
             <div class="form-group">
               <label class="form-label">Fecha de Pago <span class="required">*</span></label>
-              <input type="date" v-model="form.paymentDate" class="form-control" required />
+              <input type="date" v-model="form.paymentDate" class="form-control" required @change="onPaymentDateChange" />
             </div>
 
             <!-- Método de Pago -->
@@ -170,6 +201,7 @@ const activePaymentMethods = computed(() => {
 
 const submitting = ref(false);
 const errorMessage = ref(null);
+const cycleRecommendation = ref(null);
 
 const monthsList = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -184,10 +216,24 @@ const getTodayString = () => {
   return d.toISOString().split('T')[0];
 };
 
+const formatDateShort = (dateVal) => {
+  if (!dateVal) return '-';
+  const cleanStr = String(dateVal).split('T')[0];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cleanStr)) {
+    const [y, m, d] = cleanStr.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  const dateObj = new Date(dateVal);
+  if (isNaN(dateObj.getTime())) return dateVal;
+  return `${dateObj.getUTCDate()}/${dateObj.getUTCMonth() + 1}/${dateObj.getUTCFullYear()}`;
+};
+
 const form = reactive({
   studentId: '',
   month: new Date().getMonth() + 1,
   year: currentY,
+  cycleStartDate: '',
+  cycleEndDate: '',
   amount: 50000,
   paymentDate: getTodayString(),
   paymentMethod: 'EFECTIVO',
@@ -215,8 +261,62 @@ const updateSuggestedAmount = () => {
   }
 };
 
+const loadCycleRecommendation = async () => {
+  const studentIdToUse = props.student ? props.student.id : form.studentId;
+  if (!studentIdToUse) return;
+
+  const res = await paymentStore.fetchRecommendedCycle(studentIdToUse, form.paymentDate);
+  if (res && res.success && res.data) {
+    cycleRecommendation.value = res.data;
+    if (res.data.recommendedStartDate) {
+      form.cycleStartDate = String(res.data.recommendedStartDate).split('T')[0];
+    }
+    if (res.data.recommendedEndDate) {
+      form.cycleEndDate = String(res.data.recommendedEndDate).split('T')[0];
+    }
+    if (res.data.month) form.month = res.data.month;
+    if (res.data.year) form.year = res.data.year;
+  }
+};
+
 const onStudentChange = () => {
   updateSuggestedAmount();
+  loadCycleRecommendation();
+};
+
+const onPaymentDateChange = () => {
+  loadCycleRecommendation();
+};
+
+const onCycleStartDateChange = () => {
+  if (form.cycleStartDate) {
+    const start = new Date(`${form.cycleStartDate}T12:00:00.000Z`);
+    const y = start.getUTCFullYear();
+    const m = start.getUTCMonth();
+    const d = start.getUTCDate();
+
+    let nextM = m + 1;
+    let nextY = y;
+    if (nextM > 11) { nextM = 0; nextY = y + 1; }
+
+    const daysInNextM = new Date(Date.UTC(nextY, nextM + 1, 0)).getUTCDate();
+    let endDay = d > daysInNextM ? daysInNextM : d - 1;
+    let endMonth = nextM;
+    let endYear = nextY;
+
+    if (d <= daysInNextM) {
+      const anniversary = new Date(Date.UTC(nextY, nextM, d, 12, 0, 0, 0));
+      anniversary.setUTCDate(anniversary.getUTCDate() - 1);
+      endYear = anniversary.getUTCFullYear();
+      endMonth = anniversary.getUTCMonth();
+      endDay = anniversary.getUTCDate();
+    }
+
+    const endFormatted = `${endYear}-${String(endMonth + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+    form.cycleEndDate = endFormatted;
+    form.month = start.getUTCMonth() + 1;
+    form.year = start.getUTCFullYear();
+  }
 };
 
 const onExemptChange = () => {
@@ -237,6 +337,7 @@ const onExemptChange = () => {
 
 const resetForm = async () => {
   errorMessage.value = null;
+  cycleRecommendation.value = null;
   form.studentId = props.student ? props.student.id : '';
   form.month = props.preSelectedMonth || (new Date().getMonth() + 1);
   form.year = props.preSelectedYear || currentY;
@@ -247,6 +348,7 @@ const resetForm = async () => {
 
   await paymentStore.fetchDefaultFees();
   updateSuggestedAmount();
+  await loadCycleRecommendation();
 };
 
 watch(() => props.show, (newVal) => {
@@ -257,6 +359,7 @@ watch(() => props.show, (newVal) => {
 
 watch(() => props.student, () => {
   updateSuggestedAmount();
+  loadCycleRecommendation();
 });
 
 onMounted(() => {
@@ -285,6 +388,8 @@ const handleSubmit = async () => {
       studentId: studentIdToUse,
       month: form.month,
       year: form.year,
+      cycleStartDate: form.cycleStartDate,
+      cycleEndDate: form.cycleEndDate,
       amount: form.amount,
       paymentDate: form.paymentDate,
       paymentMethod: form.paymentMethod,
@@ -414,6 +519,43 @@ const handleSubmit = async () => {
   background-color: var(--color-danger-bg);
   color: var(--color-danger);
   border: 1px solid #fecaca;
+}
+
+.alert-warning-interruption {
+  background-color: #fffbeb;
+  border: 1px solid #fef3c7;
+  color: #92400e;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--border-radius-md);
+}
+
+.alert-warning-interruption p {
+  font-size: 0.82rem;
+  margin: 0.2rem 0;
+  color: #b45309;
+}
+
+.alert-info-cycle {
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  padding: 0.75rem 1rem;
+  border-radius: var(--border-radius-md);
+  font-size: 0.85rem;
+}
+
+.cycle-tag {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1d4ed8;
+  background-color: #dbeafe;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--border-radius-md);
+  margin-top: 0.3rem;
 }
 
 .student-info-badge {

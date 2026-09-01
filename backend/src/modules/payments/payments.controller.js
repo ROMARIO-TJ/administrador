@@ -77,6 +77,26 @@ export class PaymentsController {
   }
 
   /**
+   * Obtener recomendación de ciclo para un nuevo pago
+   */
+  static async getRecommendedPaymentCycle(req, res, next) {
+    try {
+      const { studentId } = req.params;
+      const { targetDate } = req.query;
+      const recommendation = await PaymentsService.getRecommendedPaymentCycle(studentId, targetDate);
+      return res.json({
+        success: true,
+        data: recommendation
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  /**
    * Actualizar pago de inscripción
    */
   static async updateRegistration(req, res, next) {
