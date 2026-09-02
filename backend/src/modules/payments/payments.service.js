@@ -6,7 +6,8 @@ import {
   calculateCycleEndDate,
   inferHistoricalCycle,
   getRecommendedCycle,
-  formatPeriodLabel
+  formatPeriodLabel,
+  getDaysInMonth
 } from '../../utils/cycleUtils.js';
 
 const MONTH_NAMES = [
@@ -515,6 +516,11 @@ export class PaymentsService {
     const currentMonth = new Date().getMonth() + 1; // 1-12
     const today = parseUtcDate(new Date());
 
+    // Ordenar pagos procesados para la búsqueda de ciclo consecutivo
+    const sortedPaymentsAsc = [...processedPayments].sort((a, b) => a.cycleEndDate.getTime() - b.cycleEndDate.getTime());
+    const sortedPaymentsDesc = [...processedPayments].sort((a, b) => b.cycleEndDate.getTime() - a.cycleEndDate.getTime());
+    const lastPaidCycleEnd = sortedPaymentsDesc.length > 0 ? sortedPaymentsDesc[0].cycleEndDate : null;
+
     const yearMonthlyGrid = Array.from({ length: 12 }, (_, index) => {
       const monthNum = index + 1;
       const payment = monthlyPaymentsMap.get(monthNum) || null;
@@ -527,10 +533,33 @@ export class PaymentsService {
       let periodLabel = payment ? payment.periodLabel : '';
 
       if (!payment) {
-        const entryDay = entryDate ? entryDate.getUTCDate() : 1;
-        const gridStartDate = new Date(Date.UTC(targetYear, monthNum - 1, entryDay, 12, 0, 0, 0));
-        cycleStartDate = gridStartDate;
-        cycleEndDate = calculateCycleEndDate(gridStartDate);
+        // Encontrar el último pago realizado antes de este mes
+        const priorPayments = sortedPaymentsAsc.filter(p => {
+          const pMonth = p.cycleStartDate ? (p.cycleStartDate.getUTCMonth() + 1) : p.month;
+          const pYear = p.cycleStartDate ? p.cycleStartDate.getUTCFullYear() : p.year;
+          return (pYear < targetYear) || (pYear === targetYear && pMonth < monthNum);
+        });
+
+        if (priorPayments.length > 0) {
+          const lastPrior = priorPayments[priorPayments.length - 1];
+          const lastEnd = lastPrior.cycleEndDate;
+          const lastStartD = lastPrior.cycleStartDate ? lastPrior.cycleStartDate.getUTCDate() : 1;
+          const lastEndD = lastEnd.getUTCDate();
+          const lastEndMonthMaxDays = getDaysInMonth(lastEnd.getUTCFullYear(), lastEnd.getUTCMonth() + 1);
+
+          if (lastStartD > lastEndMonthMaxDays && lastEndD === lastEndMonthMaxDays) {
+            cycleStartDate = new Date(Date.UTC(lastEnd.getUTCFullYear(), lastEnd.getUTCMonth(), lastEndD, 12, 0, 0, 0));
+          } else {
+            cycleStartDate = new Date(Date.UTC(lastEnd.getUTCFullYear(), lastEnd.getUTCMonth(), lastEndD + 1, 12, 0, 0, 0));
+          }
+        } else {
+          const entryDay = entryDate ? entryDate.getUTCDate() : 1;
+          const maxDays = getDaysInMonth(targetYear, monthNum);
+          const startDay = Math.min(entryDay, maxDays);
+          cycleStartDate = new Date(Date.UTC(targetYear, monthNum - 1, startDay, 12, 0, 0, 0));
+        }
+
+        cycleEndDate = calculateCycleEndDate(cycleStartDate);
         periodLabel = formatPeriodLabel(cycleStartDate, cycleEndDate);
       }
       
@@ -544,7 +573,7 @@ export class PaymentsService {
         } else if (targetYear < currentYear || (targetYear === currentYear && monthNum < currentMonth)) {
           status = 'PENDING';
         } else if (targetYear === currentYear && monthNum === currentMonth) {
-          if (today.getTime() >= cycleStartDate.getTime()) {
+          if (today.getTime() >= cycleStartDate.getTime() || (lastPaidCycleEnd && today.getTime() > lastPaidCycleEnd.getTime())) {
             status = 'PENDING';
           } else {
             status = 'FUTURE';
@@ -614,9 +643,6 @@ export class PaymentsService {
     if (!student.registration) {
       pendingBalance += defaultFees.registrationFee;
     }
-
-    const sortedPayments = [...processedPayments].sort((a, b) => b.cycleEndDate.getTime() - a.cycleEndDate.getTime());
-    const lastPaidCycleEnd = sortedPayments.length > 0 ? sortedPayments[0].cycleEndDate : null;
 
     if (student.status === 'ACTIVE') {
       if (!lastPaidCycleEnd) {

@@ -20,139 +20,142 @@
           <button type="button" class="close-btn" @click="close">&times;</button>
         </div>
 
-        <form @submit.prevent="handleSubmit" class="modal-body">
-          <div v-if="errorMessage" class="alert alert-danger">
-            {{ errorMessage }}
-          </div>
-
-          <!-- Selección de Alumno -->
-          <div class="form-group" v-if="!student">
-            <label class="form-label">Alumno <span class="required">*</span></label>
-            <select v-model="form.studentId" class="form-control" @change="onStudentChange" required>
-              <option value="" disabled>Seleccione un alumno...</option>
-              <option v-for="st in students" :key="st.id" :value="st.id">
-                {{ st.firstName }} {{ st.lastName }} — {{ st.document }} ({{ st.category ? st.category.name : 'Sin categoría' }})
-              </option>
-            </select>
-          </div>
-
-          <!-- Alumno Fijo -->
-          <div class="student-info-badge" v-else>
-            <span class="label">Alumno:</span>
-            <strong>{{ student.firstName }} {{ student.lastName }}</strong>
-            <span class="doc">Doc: {{ student.document }}</span>
-          </div>
-
-          <!-- Alerta de Interrupción o Sugerencia de Ciclo -->
-          <div v-if="cycleRecommendation && cycleRecommendation.hasInterruption" class="alert alert-warning-interruption">
-            <div class="alert-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                <line x1="12" y1="9" x2="12" y2="13"></line>
-                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-              </svg>
-            </div>
-            <div>
-              <strong>Se detectó una interrupción de asistencia</strong>
-              <p>El periodo del {{ formatDateShort(cycleRecommendation.interruptionFrom) }} al {{ formatDateShort(cycleRecommendation.interruptionTo) }} no generó deuda.</p>
-              <span class="cycle-tag">Nuevo ciclo sugerido: {{ formatDateShort(cycleRecommendation.recommendedStartDate) }} → {{ formatDateShort(cycleRecommendation.recommendedEndDate) }}</span>
-            </div>
-          </div>
-          <div v-else-if="cycleRecommendation && cycleRecommendation.recommendedStartDate" class="alert alert-info-cycle">
-            <span class="cycle-tag font-bold">Ciclo sugerido: {{ formatDateShort(cycleRecommendation.recommendedStartDate) }} → {{ formatDateShort(cycleRecommendation.recommendedEndDate) }}</span>
-          </div>
-
-          <!-- Fechas de Inicio y Fin de Ciclo de Cobertura -->
-          <div class="form-row-2">
-            <div class="form-group">
-              <label class="form-label">Inicio del Ciclo <span class="required">*</span></label>
-              <input type="date" v-model="form.cycleStartDate" class="form-control" required @change="onCycleStartDateChange" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Fin del Ciclo <span class="required">*</span></label>
-              <input type="date" v-model="form.cycleEndDate" class="form-control" required />
-            </div>
-          </div>
-
-          <div class="form-row-2">
-            <!-- Selección de Mes Referencial -->
-            <div class="form-group">
-              <label class="form-label">Mes Referencial <span class="required">*</span></label>
-              <select v-model.number="form.month" class="form-control" required>
-                <option v-for="(mName, idx) in monthsList" :key="idx + 1" :value="idx + 1">
-                  {{ mName }}
-                </option>
-              </select>
+        <form @submit.prevent="handleSubmit" class="modal-form-content">
+          <div class="modal-body">
+            <div v-if="errorMessage" class="alert alert-danger">
+              {{ errorMessage }}
             </div>
 
-            <!-- Selección de Año Referencial -->
-            <div class="form-group">
-              <label class="form-label">Año <span class="required">*</span></label>
-              <select v-model.number="form.year" class="form-control" required>
-                <option v-for="y in yearsList" :key="y" :value="y">
-                  {{ y }}
-                </option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Opción de Exonerar (Inasistencia) -->
-          <div class="form-group checkbox-group">
-            <label class="checkbox-label">
-              <input type="checkbox" v-model="form.isExempt" @change="onExemptChange" />
-              <span>Exonerar cobro por inasistencia (Sin costo)</span>
-            </label>
-          </div>
-
-          <!-- Valor de la Mensualidad -->
-          <div class="form-group">
-            <label class="form-label">Valor de Mensualidad (COP) <span class="required">*</span></label>
-            <div class="input-prefix-wrapper">
-              <span class="prefix-symbol">$</span>
-              <input
-                type="number"
-                v-model.number="form.amount"
-                class="form-control prefixed"
-                placeholder="50000"
-                min="0"
-                step="1000"
+            <!-- Selección de Alumno con Buscador Interactivo -->
+            <div class="form-group" v-if="!student">
+              <label class="form-label">Alumno <span class="required">*</span></label>
+              <StudentSearchSelect
+                v-model="form.studentId"
+                :students="students"
+                placeholder="Buscar por nombre, documento o categoría..."
+                @change="onStudentChange"
                 required
-                :disabled="form.isExempt"
               />
             </div>
-            <small class="hint-text">
-              Tarifa mensual sugerida para este ciclo.
-            </small>
-          </div>
 
-          <div class="form-row-2">
-            <!-- Fecha de Pago -->
-            <div class="form-group">
-              <label class="form-label">Fecha de Pago <span class="required">*</span></label>
-              <input type="date" v-model="form.paymentDate" class="form-control" required @change="onPaymentDateChange" />
+            <!-- Alumno Fijo -->
+            <div class="student-info-badge" v-else>
+              <span class="label">Alumno:</span>
+              <strong>{{ student.firstName }} {{ student.lastName }}</strong>
+              <span class="doc">Doc: {{ student.document }}</span>
             </div>
 
-            <!-- Método de Pago -->
-            <div class="form-group">
-              <label class="form-label">Método de Pago <span class="required">*</span></label>
-              <select v-model="form.paymentMethod" class="form-control" required :disabled="form.isExempt">
-                <option v-for="pm in activePaymentMethods" :key="pm.id" :value="pm.name.toUpperCase()">
-                  {{ pm.name }}
-                </option>
-                <option v-if="form.isExempt" value="EXONERADO">Exonerado (Sin Costo)</option>
-              </select>
+            <!-- Alerta de Interrupción o Sugerencia de Ciclo -->
+            <div v-if="cycleRecommendation && cycleRecommendation.hasInterruption" class="alert alert-warning-interruption">
+              <div class="alert-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                  <line x1="12" y1="9" x2="12" y2="13"></line>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+              </div>
+              <div>
+                <strong>Se detectó una interrupción de asistencia</strong>
+                <p>El periodo del {{ formatDateShort(cycleRecommendation.interruptionFrom) }} al {{ formatDateShort(cycleRecommendation.interruptionTo) }} no generó deuda.</p>
+                <span class="cycle-tag">Nuevo ciclo sugerido: {{ formatDateShort(cycleRecommendation.recommendedStartDate) }} → {{ formatDateShort(cycleRecommendation.recommendedEndDate) }}</span>
+              </div>
             </div>
-          </div>
+            <div v-else-if="cycleRecommendation && cycleRecommendation.recommendedStartDate" class="alert alert-info-cycle">
+              <span class="cycle-tag font-bold">Ciclo sugerido: {{ formatDateShort(cycleRecommendation.recommendedStartDate) }} → {{ formatDateShort(cycleRecommendation.recommendedEndDate) }}</span>
+            </div>
 
-          <!-- Observaciones -->
-          <div class="form-group">
-            <label class="form-label">Observaciones / Notas (Opcional)</label>
-            <textarea
-              v-model="form.notes"
-              class="form-control textarea"
-              rows="2"
-              placeholder="Detalles sobre el pago o número de transacción..."
-            ></textarea>
+            <!-- Fechas de Inicio y Fin de Ciclo de Cobertura -->
+            <div class="form-row-2">
+              <div class="form-group">
+                <label class="form-label">Inicio del Ciclo <span class="required">*</span></label>
+                <input type="date" v-model="form.cycleStartDate" class="form-control" required @change="onCycleStartDateChange" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Fin del Ciclo <span class="required">*</span></label>
+                <input type="date" v-model="form.cycleEndDate" class="form-control" required />
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <!-- Selección de Mes Referencial -->
+              <div class="form-group">
+                <label class="form-label">Mes Referencial <span class="required">*</span></label>
+                <select v-model.number="form.month" class="form-control" required>
+                  <option v-for="(mName, idx) in monthsList" :key="idx + 1" :value="idx + 1">
+                    {{ mName }}
+                  </option>
+                </select>
+              </div>
+
+              <!-- Selección de Año Referencial -->
+              <div class="form-group">
+                <label class="form-label">Año <span class="required">*</span></label>
+                <select v-model.number="form.year" class="form-control" required>
+                  <option v-for="y in yearsList" :key="y" :value="y">
+                    {{ y }}
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Opción de Exonerar (Inasistencia) -->
+            <div class="form-group checkbox-group">
+              <label class="checkbox-label">
+                <input type="checkbox" v-model="form.isExempt" @change="onExemptChange" />
+                <span>Exonerar cobro por inasistencia (Sin costo)</span>
+              </label>
+            </div>
+
+            <!-- Valor de la Mensualidad -->
+            <div class="form-group">
+              <label class="form-label">Valor de Mensualidad (COP) <span class="required">*</span></label>
+              <div class="input-prefix-wrapper">
+                <span class="prefix-symbol">$</span>
+                <input
+                  type="number"
+                  v-model.number="form.amount"
+                  class="form-control prefixed"
+                  placeholder="50000"
+                  min="0"
+                  step="1000"
+                  required
+                  :disabled="form.isExempt"
+                />
+              </div>
+              <small class="hint-text">
+                Tarifa mensual sugerida para este ciclo.
+              </small>
+            </div>
+
+            <div class="form-row-2">
+              <!-- Fecha de Pago -->
+              <div class="form-group">
+                <label class="form-label">Fecha de Pago <span class="required">*</span></label>
+                <input type="date" v-model="form.paymentDate" class="form-control" required @change="onPaymentDateChange" />
+              </div>
+
+              <!-- Método de Pago -->
+              <div class="form-group">
+                <label class="form-label">Método de Pago <span class="required">*</span></label>
+                <select v-model="form.paymentMethod" class="form-control" required :disabled="form.isExempt">
+                  <option v-for="pm in activePaymentMethods" :key="pm.id" :value="pm.name.toUpperCase()">
+                    {{ pm.name }}
+                  </option>
+                  <option v-if="form.isExempt" value="EXONERADO">Exonerado (Sin Costo)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Observaciones -->
+            <div class="form-group">
+              <label class="form-label">Observaciones / Notas (Opcional)</label>
+              <textarea
+                v-model="form.notes"
+                class="form-control textarea"
+                rows="2"
+                placeholder="Detalles sobre el pago o número de transacción..."
+              ></textarea>
+            </div>
           </div>
 
           <!-- Footer Botones -->
@@ -175,6 +178,7 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { usePaymentStore } from '../../../stores/paymentStore';
 import { useSettingsStore } from '../../../stores/settingsStore';
+import StudentSearchSelect from '../../../components/ui/StudentSearchSelect.vue';
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -428,6 +432,7 @@ const handleSubmit = async () => {
 .modal-card {
   width: 100%;
   max-width: 540px;
+  max-height: 90vh;
   background: var(--color-white);
   border-radius: var(--border-radius-lg);
   box-shadow: var(--shadow-lg);
@@ -456,6 +461,7 @@ const handleSubmit = async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .modal-title-box {
@@ -502,11 +508,21 @@ const handleSubmit = async () => {
   color: var(--color-dark);
 }
 
+.modal-form-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .modal-body {
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .alert {
@@ -680,7 +696,10 @@ const handleSubmit = async () => {
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
-  margin-top: 0.5rem;
+  padding: 1rem 1.5rem;
+  background-color: var(--color-gray-100);
+  border-top: 1px solid var(--color-gray-200);
+  flex-shrink: 0;
 }
 
 .btn {

@@ -1030,16 +1030,16 @@ const formatDate = (dStr) => {
 }
 
 .modal-card {
-  width: 100%; max-width: 480px; background: white; border-radius: var(--border-radius-lg); overflow: hidden;
+  width: 100%; max-width: 480px; max-height: 90vh; background: white; border-radius: var(--border-radius-lg); overflow: hidden; display: flex; flex-direction: column;
 }
 
 .modal-header {
   padding: 1rem 1.25rem; background: var(--color-gray-100); border-bottom: 1px solid var(--color-gray-200);
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
 }
 
-.modal-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
-.modal-footer { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem; }
+.modal-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; flex: 1; overflow-y: auto; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--color-gray-200); flex-shrink: 0; }
 .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; }
 .mt-2 { margin-top: 0.5rem; }
 
