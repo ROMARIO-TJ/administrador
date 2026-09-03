@@ -1,5 +1,5 @@
 import prisma from '../../../config/db.js';
-import { inferHistoricalCycle, parseUtcDate, formatPeriodLabel } from '../../../utils/cycleUtils.js';
+import { inferHistoricalCycle, parseUtcDate, formatPeriodLabel, calculateCycleEndDate, getDaysInMonth } from '../../../utils/cycleUtils.js';
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -77,18 +77,43 @@ export async function getDebtorsReport(filters = {}) {
     }).sort((a, b) => b.cycleEndDate.getTime() - a.cycleEndDate.getTime());
 
     const lastPaidCycleEnd = processedPayments.length > 0 ? processedPayments[0].cycleEndDate : null;
+    const lastPaidCycleStart = processedPayments.length > 0 ? processedPayments[0].cycleStartDate : null;
     const pendingMonthsNames = [];
 
-    // Evaluar si el ciclo actual está vencido
-    if (!lastPaidCycleEnd) {
-      const entryDate = st.entryDate ? parseUtcDate(st.entryDate) : today;
-      if (today.getTime() >= entryDate.getTime()) {
-        pendingMonthsNames.push(MONTH_NAMES[today.getUTCMonth()]);
+    // Evaluar qué ciclos de mensualidad están vencidos a la fecha (today)
+    let nextStart;
+    let nextEnd;
+
+    if (lastPaidCycleEnd) {
+      const lastStartD = lastPaidCycleStart ? lastPaidCycleStart.getUTCDate() : 1;
+      const lastEndD = lastPaidCycleEnd.getUTCDate();
+      const lastEndMonthMaxDays = getDaysInMonth(lastPaidCycleEnd.getUTCFullYear(), lastPaidCycleEnd.getUTCMonth() + 1);
+
+      if (lastStartD > lastEndMonthMaxDays && lastEndD === lastEndMonthMaxDays) {
+        nextStart = new Date(Date.UTC(lastPaidCycleEnd.getUTCFullYear(), lastPaidCycleEnd.getUTCMonth(), lastEndD, 12, 0, 0, 0));
+      } else {
+        nextStart = new Date(Date.UTC(lastPaidCycleEnd.getUTCFullYear(), lastPaidCycleEnd.getUTCMonth(), lastEndD + 1, 12, 0, 0, 0));
       }
+      nextEnd = calculateCycleEndDate(nextStart);
     } else {
-      if (today.getTime() > lastPaidCycleEnd.getTime()) {
-        pendingMonthsNames.push(MONTH_NAMES[today.getUTCMonth()]);
+      const entryDate = st.entryDate ? parseUtcDate(st.entryDate) : today;
+      nextStart = entryDate;
+      nextEnd = calculateCycleEndDate(nextStart);
+    }
+
+    while (today.getTime() >= nextStart.getTime()) {
+      pendingMonthsNames.push(MONTH_NAMES[nextStart.getUTCMonth()]);
+
+      const currStartD = nextStart.getUTCDate();
+      const currEndD = nextEnd.getUTCDate();
+      const currEndMonthMaxDays = getDaysInMonth(nextEnd.getUTCFullYear(), nextEnd.getUTCMonth() + 1);
+
+      if (currStartD > currEndMonthMaxDays && currEndD === currEndMonthMaxDays) {
+        nextStart = new Date(Date.UTC(nextEnd.getUTCFullYear(), nextEnd.getUTCMonth(), currEndD, 12, 0, 0, 0));
+      } else {
+        nextStart = new Date(Date.UTC(nextEnd.getUTCFullYear(), nextEnd.getUTCMonth(), currEndD + 1, 12, 0, 0, 0));
       }
+      nextEnd = calculateCycleEndDate(nextStart);
     }
 
     const pendingMonthlyAmount = pendingMonthsNames.length * effectiveFee;

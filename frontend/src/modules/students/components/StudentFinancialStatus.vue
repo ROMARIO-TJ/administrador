@@ -131,6 +131,8 @@
                 <span class="month-period-label" v-if="m.periodLabel && m.status !== 'NOT_APPLICABLE'">{{ m.periodLabel }}</span>
               </div>
               <span v-if="m.isPaid" class="month-badge paid">Pagado</span>
+              <span v-else-if="m.status === 'OVERDUE'" class="month-badge overdue">Vencido</span>
+              <span v-else-if="m.status === 'IN_PROGRESS'" class="month-badge in-progress">En curso</span>
               <span v-else-if="m.status === 'PENDING'" class="month-badge pending">Pendiente</span>
               <span v-else-if="m.status === 'NOT_APPLICABLE'" class="month-badge na">Inactivo</span>
               <span v-else class="month-badge future">Próximo</span>
@@ -143,11 +145,21 @@
                 <span class="month-date">{{ formatDateShort(m.payment.paymentDate) }}</span>
                 <span class="month-consecutive">{{ m.payment.consecutive }}</span>
               </template>
-              <template v-else-if="m.status === 'PENDING'">
+              <template v-else-if="m.status === 'OVERDUE'">
                 <span class="month-amount text-danger">{{ formatCurrency(statusData.effectiveMonthlyFee) }}</span>
                 <button
                   type="button"
-                  class="btn-pay-month"
+                  class="btn-pay-month btn-pay-overdue"
+                  @click="openMonthlyModal(m.month, selectedYear)"
+                >
+                  Pagar {{ m.monthName }}
+                </button>
+              </template>
+              <template v-else-if="m.status === 'IN_PROGRESS' || m.status === 'PENDING'">
+                <span class="month-amount text-amber">{{ formatCurrency(statusData.effectiveMonthlyFee) }}</span>
+                <button
+                  type="button"
+                  class="btn-pay-month btn-pay-in-progress"
                   @click="openMonthlyModal(m.month, selectedYear)"
                 >
                   Pagar {{ m.monthName }}
@@ -368,6 +380,8 @@ const handlePaymentSuccess = () => {
 
 const getMonthBoxClass = (m) => {
   if (m.isPaid) return 'box-paid';
+  if (m.status === 'OVERDUE') return 'box-overdue';
+  if (m.status === 'IN_PROGRESS') return 'box-in-progress';
   if (m.status === 'PENDING') return 'box-pending';
   if (m.status === 'NOT_APPLICABLE') return 'box-na';
   return 'box-future';
@@ -658,9 +672,15 @@ const formatMethod = (method) => {
   border-color: #BBF7D0;
 }
 
+.box-overdue,
 .box-pending {
   background-color: #FEF2F2;
   border-color: #FECACA;
+}
+
+.box-in-progress {
+  background-color: #FFFBEB;
+  border-color: #FDE68A;
 }
 
 .box-na {
@@ -711,9 +731,15 @@ const formatMethod = (method) => {
   color: #15803D;
 }
 
+.month-badge.overdue,
 .month-badge.pending {
   background-color: #FEE2E2;
   color: #B91C1C;
+}
+
+.month-badge.in-progress {
+  background-color: #FEF3C7;
+  color: #D97706;
 }
 
 .month-badge.na {
@@ -737,6 +763,10 @@ const formatMethod = (method) => {
   font-size: 1rem;
 }
 
+.text-amber {
+  color: #D97706;
+}
+
 .month-date {
   font-size: 0.75rem;
   color: var(--color-gray-500);
@@ -754,16 +784,28 @@ const formatMethod = (method) => {
   padding: 0.35rem 0.6rem;
   font-size: 0.76rem;
   font-weight: 700;
-  background-color: var(--color-danger);
-  color: var(--color-white);
   border: none;
   border-radius: var(--border-radius-md);
   cursor: pointer;
   transition: var(--transition-fast);
 }
 
-.btn-pay-month:hover {
+.btn-pay-overdue {
+  background-color: var(--color-danger);
+  color: var(--color-white);
+}
+
+.btn-pay-overdue:hover {
   background-color: var(--color-danger-hover);
+}
+
+.btn-pay-in-progress {
+  background-color: #D97706;
+  color: var(--color-white);
+}
+
+.btn-pay-in-progress:hover {
+  background-color: #B45309;
 }
 
 /* History Card & Data Table */

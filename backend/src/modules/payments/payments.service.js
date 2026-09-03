@@ -516,67 +516,81 @@ export class PaymentsService {
     const currentMonth = new Date().getMonth() + 1; // 1-12
     const today = parseUtcDate(new Date());
 
-    // Ordenar pagos procesados para la búsqueda de ciclo consecutivo
-    const sortedPaymentsAsc = [...processedPayments].sort((a, b) => a.cycleEndDate.getTime() - b.cycleEndDate.getTime());
+    // Ordenar pagos procesados por fecha de inicio de ciclo para cálculo de cadena consecutiva
+    const sortedPaymentsAsc = [...processedPayments].sort((a, b) => a.cycleStartDate.getTime() - b.cycleStartDate.getTime());
     const sortedPaymentsDesc = [...processedPayments].sort((a, b) => b.cycleEndDate.getTime() - a.cycleEndDate.getTime());
     const lastPaidCycleEnd = sortedPaymentsDesc.length > 0 ? sortedPaymentsDesc[0].cycleEndDate : null;
+    const lastPaidCycleStart = sortedPaymentsDesc.length > 0 ? sortedPaymentsDesc[0].cycleStartDate : null;
+
+    // Buscar si hay un ciclo pagado previo a targetYear para iniciar la cadena consecutiva
+    const priorToTargetYear = sortedPaymentsAsc.filter(p => p.cycleStartDate.getUTCFullYear() < targetYear);
+    let runningCycleStart = priorToTargetYear.length > 0 ? priorToTargetYear[priorToTargetYear.length - 1].cycleStartDate : null;
+    let runningCycleEnd = priorToTargetYear.length > 0 ? priorToTargetYear[priorToTargetYear.length - 1].cycleEndDate : null;
+
+    const entryDate = student.entryDate ? parseUtcDate(student.entryDate) : null;
 
     const yearMonthlyGrid = Array.from({ length: 12 }, (_, index) => {
       const monthNum = index + 1;
       const payment = monthlyPaymentsMap.get(monthNum) || null;
       const isPaid = !!payment;
-      
-      const entryDate = student.entryDate ? parseUtcDate(student.entryDate) : null;
 
       let cycleStartDate = payment ? payment.cycleStartDate : null;
       let cycleEndDate = payment ? payment.cycleEndDate : null;
       let periodLabel = payment ? payment.periodLabel : '';
 
-      if (!payment) {
-        // Encontrar el último pago realizado antes de este mes
-        const priorPayments = sortedPaymentsAsc.filter(p => {
-          const pMonth = p.cycleStartDate ? (p.cycleStartDate.getUTCMonth() + 1) : p.month;
-          const pYear = p.cycleStartDate ? p.cycleStartDate.getUTCFullYear() : p.year;
-          return (pYear < targetYear) || (pYear === targetYear && pMonth < monthNum);
-        });
-
-        if (priorPayments.length > 0) {
-          const lastPrior = priorPayments[priorPayments.length - 1];
-          const lastEnd = lastPrior.cycleEndDate;
-          const lastStartD = lastPrior.cycleStartDate ? lastPrior.cycleStartDate.getUTCDate() : 1;
-          const lastEndD = lastEnd.getUTCDate();
-          const lastEndMonthMaxDays = getDaysInMonth(lastEnd.getUTCFullYear(), lastEnd.getUTCMonth() + 1);
+      if (payment) {
+        runningCycleStart = payment.cycleStartDate;
+        runningCycleEnd = payment.cycleEndDate;
+      } else {
+        if (runningCycleEnd) {
+          const lastStartD = runningCycleStart ? runningCycleStart.getUTCDate() : 1;
+          const lastEndD = runningCycleEnd.getUTCDate();
+          const lastEndMonthMaxDays = getDaysInMonth(runningCycleEnd.getUTCFullYear(), runningCycleEnd.getUTCMonth() + 1);
 
           if (lastStartD > lastEndMonthMaxDays && lastEndD === lastEndMonthMaxDays) {
-            cycleStartDate = new Date(Date.UTC(lastEnd.getUTCFullYear(), lastEnd.getUTCMonth(), lastEndD, 12, 0, 0, 0));
+            cycleStartDate = new Date(Date.UTC(runningCycleEnd.getUTCFullYear(), runningCycleEnd.getUTCMonth(), lastEndD, 12, 0, 0, 0));
           } else {
-            cycleStartDate = new Date(Date.UTC(lastEnd.getUTCFullYear(), lastEnd.getUTCMonth(), lastEndD + 1, 12, 0, 0, 0));
+            cycleStartDate = new Date(Date.UTC(runningCycleEnd.getUTCFullYear(), runningCycleEnd.getUTCMonth(), lastEndD + 1, 12, 0, 0, 0));
           }
+          cycleEndDate = calculateCycleEndDate(cycleStartDate);
+          periodLabel = formatPeriodLabel(cycleStartDate, cycleEndDate);
+
+          runningCycleStart = cycleStartDate;
+          runningCycleEnd = cycleEndDate;
         } else {
           const entryDay = entryDate ? entryDate.getUTCDate() : 1;
           const maxDays = getDaysInMonth(targetYear, monthNum);
           const startDay = Math.min(entryDay, maxDays);
           cycleStartDate = new Date(Date.UTC(targetYear, monthNum - 1, startDay, 12, 0, 0, 0));
-        }
+          cycleEndDate = calculateCycleEndDate(cycleStartDate);
+          periodLabel = formatPeriodLabel(cycleStartDate, cycleEndDate);
 
-        cycleEndDate = calculateCycleEndDate(cycleStartDate);
-        periodLabel = formatPeriodLabel(cycleStartDate, cycleEndDate);
+          if (!entryDate || targetYear > entryDate.getUTCFullYear() || (targetYear === entryDate.getUTCFullYear() && monthNum >= entryDate.getUTCMonth() + 1)) {
+            runningCycleStart = cycleStartDate;
+            runningCycleEnd = cycleEndDate;
+          }
+        }
       }
       
-      // Determinar si el mes está vencido/pendiente
+      // Determinar si el mes está vencido / en curso / futuro / inactivo
       let status = 'FUTURE';
       if (isPaid) {
         status = 'PAID';
       } else {
         if (entryDate && (targetYear < entryDate.getUTCFullYear() || (targetYear === entryDate.getUTCFullYear() && monthNum < entryDate.getUTCMonth() + 1))) {
           status = 'NOT_APPLICABLE';
-        } else if (targetYear < currentYear || (targetYear === currentYear && monthNum < currentMonth)) {
-          status = 'PENDING';
-        } else if (targetYear === currentYear && monthNum === currentMonth) {
-          if (today.getTime() >= cycleStartDate.getTime() || (lastPaidCycleEnd && today.getTime() > lastPaidCycleEnd.getTime())) {
-            status = 'PENDING';
+        } else if (targetYear < currentYear) {
+          status = 'OVERDUE';
+        } else if (targetYear > currentYear) {
+          status = 'FUTURE';
+        } else {
+          // targetYear === currentYear
+          if (today.getTime() > cycleEndDate.getTime()) {
+            status = 'OVERDUE'; // Ciclo finalizado completamente sin pago -> ROJO (Vencido)
+          } else if (today.getTime() >= cycleStartDate.getTime() && today.getTime() <= cycleEndDate.getTime()) {
+            status = 'IN_PROGRESS'; // Ciclo activo en transcurso -> ÁMBAR / NARANJA (En curso)
           } else {
-            status = 'FUTURE';
+            status = 'FUTURE'; // Ciclo aún no inicia -> GRIS (Próximo)
           }
         }
       }
@@ -638,22 +652,46 @@ export class PaymentsService {
     const totalPaidMensualidades = student.monthlyPayments.reduce((sum, p) => sum + p.amount, 0);
     const totalPaid = totalPaidInscripciones + totalPaidMensualidades;
 
-    // Cálculo de saldo pendiente basado en la vigencia del último ciclo pagado
+    // Cálculo de saldo pendiente acumulando los ciclos vencidos a la fecha
     let pendingBalance = 0;
     if (!student.registration) {
       pendingBalance += defaultFees.registrationFee;
     }
 
     if (student.status === 'ACTIVE') {
-      if (!lastPaidCycleEnd) {
-        const entryDate = student.entryDate ? parseUtcDate(student.entryDate) : today;
-        if (today.getTime() >= entryDate.getTime()) {
-          pendingBalance += effectiveMonthlyFee;
+      let checkStart;
+      let checkEnd;
+
+      if (lastPaidCycleEnd) {
+        const lastStartD = lastPaidCycleStart ? lastPaidCycleStart.getUTCDate() : 1;
+        const lastEndD = lastPaidCycleEnd.getUTCDate();
+        const lastEndMonthMaxDays = getDaysInMonth(lastPaidCycleEnd.getUTCFullYear(), lastPaidCycleEnd.getUTCMonth() + 1);
+
+        if (lastStartD > lastEndMonthMaxDays && lastEndD === lastEndMonthMaxDays) {
+          checkStart = new Date(Date.UTC(lastPaidCycleEnd.getUTCFullYear(), lastPaidCycleEnd.getUTCMonth(), lastEndD, 12, 0, 0, 0));
+        } else {
+          checkStart = new Date(Date.UTC(lastPaidCycleEnd.getUTCFullYear(), lastPaidCycleEnd.getUTCMonth(), lastEndD + 1, 12, 0, 0, 0));
         }
+        checkEnd = calculateCycleEndDate(checkStart);
       } else {
-        if (today.getTime() > lastPaidCycleEnd.getTime()) {
-          pendingBalance += effectiveMonthlyFee;
+        const studentEntryDate = student.entryDate ? parseUtcDate(student.entryDate) : today;
+        checkStart = studentEntryDate;
+        checkEnd = calculateCycleEndDate(checkStart);
+      }
+
+      while (today.getTime() >= checkStart.getTime()) {
+        pendingBalance += effectiveMonthlyFee;
+
+        const currStartD = checkStart.getUTCDate();
+        const currEndD = checkEnd.getUTCDate();
+        const currEndMonthMaxDays = getDaysInMonth(checkEnd.getUTCFullYear(), checkEnd.getUTCMonth() + 1);
+
+        if (currStartD > currEndMonthMaxDays && currEndD === currEndMonthMaxDays) {
+          checkStart = new Date(Date.UTC(checkEnd.getUTCFullYear(), checkEnd.getUTCMonth(), currEndD, 12, 0, 0, 0));
+        } else {
+          checkStart = new Date(Date.UTC(checkEnd.getUTCFullYear(), checkEnd.getUTCMonth(), currEndD + 1, 12, 0, 0, 0));
         }
+        checkEnd = calculateCycleEndDate(checkStart);
       }
     }
 
