@@ -9,11 +9,11 @@ export class DashboardService {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth(); // 0-indexed para JavaScript
 
-    const startOfMonth = new Date(currentYear, currentMonth, 1);
-    const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999);
+    const startOfMonth = new Date(Date.UTC(currentYear, currentMonth, 1, 0, 0, 0, 0));
+    const endOfMonth = new Date(Date.UTC(currentYear, currentMonth + 1, 0, 23, 59, 59, 999));
 
-    const startOfYear = new Date(currentYear, 0, 1);
-    const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59, 999);
+    const startOfYear = new Date(Date.UTC(currentYear, 0, 1, 0, 0, 0, 0));
+    const endOfYear = new Date(Date.UTC(currentYear, 11, 31, 23, 59, 59, 999));
 
     // Consultas concurrentes en PostgreSQL
     const [

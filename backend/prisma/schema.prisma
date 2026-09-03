@@ -169,21 +169,21 @@ model Registration {
 
 // Mensualidades (Un alumno no puede pagar dos veces el mismo mes del mismo año)
 model MonthlyPayment {
-  id            Int      @id @default(autoincrement())
-  consecutive   String   @unique
-  studentId     Int
-  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  month         Int
-  year          Int
-  amount        Float    @default(50000.0)
-  paymentDate   DateTime @default(now())
-  paymentMethod String   @default("EFECTIVO")
-  notes         String?
-  registeredBy  String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@unique([studentId, month, year])
+  id             Int       @id @default(autoincrement())
+  consecutive    String    @unique
+  studentId      Int
+  student        Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  month          Int
+  year           Int
+  cycleStartDate DateTime?
+  cycleEndDate   DateTime?
+  amount         Float     @default(50000.0)
+  paymentDate    DateTime  @default(now())
+  paymentMethod  String    @default("EFECTIVO")
+  notes          String?
+  registeredBy   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 // Consecutivos automáticos para Recibos/Comprobantes de Pago

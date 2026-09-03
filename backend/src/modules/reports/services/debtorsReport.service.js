@@ -1,4 +1,5 @@
 import prisma from '../../../config/db.js';
+import { inferHistoricalCycle, parseUtcDate, formatPeriodLabel, calculateCycleEndDate, getDaysInMonth } from '../../../utils/cycleUtils.js';
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -7,13 +8,14 @@ const MONTH_NAMES = [
 
 /**
  * Reporte de Alumnos Morosos desde PostgreSQL en tiempo real
- * Consulta únicamente alumnos con mensualidades o inscripción pendientes.
+ * Consulta únicamente alumnos activos con mensualidades o inscripción pendientes según cobertura de ciclo.
  */
 export async function getDebtorsReport(filters = {}) {
   const { categoryId, search } = filters;
 
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1; // 1-12
+  const today = parseUtcDate(new Date());
+  const currentYear = today.getUTCFullYear();
+  const currentMonth = today.getUTCMonth() + 1; // 1-12
 
   // Obtener tarifas vigentes de AcademySetting
   const settings = await prisma.academySetting.findFirst();
@@ -21,7 +23,7 @@ export async function getDebtorsReport(filters = {}) {
   const defaultMonthlyFee = settings?.monthlyFee ?? 50000.0;
 
   const where = {
-    status: 'ACTIVE' // Por defecto se evalúan alumnos activos
+    status: 'ACTIVE'
   };
 
   if (categoryId && !isNaN(Number(categoryId))) {
@@ -42,9 +44,7 @@ export async function getDebtorsReport(filters = {}) {
     include: {
       category: { select: { name: true } },
       registration: true,
-      monthlyPayments: {
-        where: { year: currentYear }
-      }
+      monthlyPayments: true
     }
   });
 
@@ -56,7 +56,6 @@ export async function getDebtorsReport(filters = {}) {
   for (const st of students) {
     const effectiveFee = st.customMonthlyFee ?? defaultMonthlyFee;
 
-    // Sumatoria de esperado y recaudado para métricas
     totalExpectedIncome += defaultRegFee + (currentMonth * effectiveFee);
 
     let paidReg = st.registration ? st.registration.amount : 0;
@@ -67,14 +66,54 @@ export async function getDebtorsReport(filters = {}) {
     const isRegistrationPaid = !!st.registration;
     let pendingRegAmount = isRegistrationPaid ? 0 : defaultRegFee;
 
-    // Evaluar mensualidades pendientes de meses transcurridos en el año actual
-    const paidMonthsSet = new Set(st.monthlyPayments.map(p => p.month));
+    // Procesar ciclos de mensualidades del alumno
+    const processedPayments = st.monthlyPayments.map(p => {
+      const { cycleStartDate, cycleEndDate } = inferHistoricalCycle(p, st.entryDate);
+      return {
+        ...p,
+        cycleStartDate,
+        cycleEndDate
+      };
+    }).sort((a, b) => b.cycleEndDate.getTime() - a.cycleEndDate.getTime());
+
+    const lastPaidCycleEnd = processedPayments.length > 0 ? processedPayments[0].cycleEndDate : null;
+    const lastPaidCycleStart = processedPayments.length > 0 ? processedPayments[0].cycleStartDate : null;
     const pendingMonthsNames = [];
 
-    for (let m = 1; m <= currentMonth; m++) {
-      if (!paidMonthsSet.has(m)) {
-        pendingMonthsNames.push(MONTH_NAMES[m - 1]);
+    // Evaluar qué ciclos de mensualidad están vencidos a la fecha (today)
+    let nextStart;
+    let nextEnd;
+
+    if (lastPaidCycleEnd) {
+      const lastStartD = lastPaidCycleStart ? lastPaidCycleStart.getUTCDate() : 1;
+      const lastEndD = lastPaidCycleEnd.getUTCDate();
+      const lastEndMonthMaxDays = getDaysInMonth(lastPaidCycleEnd.getUTCFullYear(), lastPaidCycleEnd.getUTCMonth() + 1);
+
+      if (lastStartD > lastEndMonthMaxDays && lastEndD === lastEndMonthMaxDays) {
+        nextStart = new Date(Date.UTC(lastPaidCycleEnd.getUTCFullYear(), lastPaidCycleEnd.getUTCMonth(), lastEndD, 12, 0, 0, 0));
+      } else {
+        nextStart = new Date(Date.UTC(lastPaidCycleEnd.getUTCFullYear(), lastPaidCycleEnd.getUTCMonth(), lastEndD + 1, 12, 0, 0, 0));
       }
+      nextEnd = calculateCycleEndDate(nextStart);
+    } else {
+      const entryDate = st.entryDate ? parseUtcDate(st.entryDate) : today;
+      nextStart = entryDate;
+      nextEnd = calculateCycleEndDate(nextStart);
+    }
+
+    while (today.getTime() >= nextStart.getTime()) {
+      pendingMonthsNames.push(MONTH_NAMES[nextStart.getUTCMonth()]);
+
+      const currStartD = nextStart.getUTCDate();
+      const currEndD = nextEnd.getUTCDate();
+      const currEndMonthMaxDays = getDaysInMonth(nextEnd.getUTCFullYear(), nextEnd.getUTCMonth() + 1);
+
+      if (currStartD > currEndMonthMaxDays && currEndD === currEndMonthMaxDays) {
+        nextStart = new Date(Date.UTC(nextEnd.getUTCFullYear(), nextEnd.getUTCMonth(), currEndD, 12, 0, 0, 0));
+      } else {
+        nextStart = new Date(Date.UTC(nextEnd.getUTCFullYear(), nextEnd.getUTCMonth(), currEndD + 1, 12, 0, 0, 0));
+      }
+      nextEnd = calculateCycleEndDate(nextStart);
     }
 
     const pendingMonthlyAmount = pendingMonthsNames.length * effectiveFee;
@@ -83,7 +122,6 @@ export async function getDebtorsReport(filters = {}) {
     if (totalStudentPending > 0) {
       totalPendingDebtSum += totalStudentPending;
 
-      // Determinar el último pago realizado por el alumno
       let lastPayment = null;
       const allPayments = [];
 
@@ -96,11 +134,11 @@ export async function getDebtorsReport(filters = {}) {
         });
       }
 
-      st.monthlyPayments.forEach(p => {
+      processedPayments.forEach(p => {
         allPayments.push({
           date: p.paymentDate,
           amount: p.amount,
-          concept: `Mensualidad ${MONTH_NAMES[p.month - 1]} ${p.year}`,
+          concept: `Mensualidad (${formatPeriodLabel(p.cycleStartDate, p.cycleEndDate)})`,
           consecutive: p.consecutive
         });
       });
@@ -128,7 +166,6 @@ export async function getDebtorsReport(filters = {}) {
     }
   }
 
-  // Ordenar de mayor a menor deuda
   debtorsList.sort((a, b) => b.totalPending - a.totalPending);
 
   return {

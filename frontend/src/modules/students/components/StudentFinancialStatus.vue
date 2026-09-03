@@ -18,7 +18,9 @@
           <div class="kpi-info">
             <span class="kpi-title">Total Pagado</span>
             <h3 class="kpi-value text-success">{{ formatCurrency(statusData.totalPaid) }}</h3>
-            <span class="kpi-subtitle">Sumatoria total de recaudos</span>
+            <span class="kpi-subtitle font-xs">
+              M: {{ formatCurrency(statusData.totalPaidMensualidades) }} | I: {{ formatCurrency(statusData.totalPaidInscripciones) }}
+            </span>
           </div>
         </div>
 
@@ -124,27 +126,48 @@
             :class="['month-box', getMonthBoxClass(m)]"
           >
             <div class="month-top">
-              <span class="month-name">{{ m.monthName }}</span>
+              <div class="month-name-group">
+                <span class="month-name">{{ m.monthName }}</span>
+                <span class="month-period-label" v-if="m.periodLabel && m.status !== 'NOT_APPLICABLE'">{{ m.periodLabel }}</span>
+              </div>
               <span v-if="m.isPaid" class="month-badge paid">Pagado</span>
+              <span v-else-if="m.status === 'OVERDUE'" class="month-badge overdue">Vencido</span>
+              <span v-else-if="m.status === 'IN_PROGRESS'" class="month-badge in-progress">En curso</span>
               <span v-else-if="m.status === 'PENDING'" class="month-badge pending">Pendiente</span>
+              <span v-else-if="m.status === 'NOT_APPLICABLE'" class="month-badge na">Inactivo</span>
               <span v-else class="month-badge future">Próximo</span>
             </div>
 
             <div class="month-body">
               <template v-if="m.isPaid && m.payment">
-                <span class="month-amount">{{ formatCurrency(m.payment.amount) }}</span>
+                <span v-if="m.payment.amount === 0 && m.payment.paymentMethod === 'EXONERADO'" class="month-amount text-muted">Exonerado</span>
+                <span v-else class="month-amount">{{ formatCurrency(m.payment.amount) }}</span>
                 <span class="month-date">{{ formatDateShort(m.payment.paymentDate) }}</span>
                 <span class="month-consecutive">{{ m.payment.consecutive }}</span>
               </template>
-              <template v-else-if="m.status === 'PENDING'">
+              <template v-else-if="m.status === 'OVERDUE'">
                 <span class="month-amount text-danger">{{ formatCurrency(statusData.effectiveMonthlyFee) }}</span>
                 <button
                   type="button"
-                  class="btn-pay-month"
+                  class="btn-pay-month btn-pay-overdue"
                   @click="openMonthlyModal(m.month, selectedYear)"
                 >
                   Pagar {{ m.monthName }}
                 </button>
+              </template>
+              <template v-else-if="m.status === 'IN_PROGRESS' || m.status === 'PENDING'">
+                <span class="month-amount text-amber">{{ formatCurrency(statusData.effectiveMonthlyFee) }}</span>
+                <button
+                  type="button"
+                  class="btn-pay-month btn-pay-in-progress"
+                  @click="openMonthlyModal(m.month, selectedYear)"
+                >
+                  Pagar {{ m.monthName }}
+                </button>
+              </template>
+              <template v-else-if="m.status === 'NOT_APPLICABLE'">
+                <span class="month-amount text-muted">-</span>
+                <span class="month-date text-muted">Previo a ingreso</span>
               </template>
               <template v-else>
                 <span class="month-amount text-muted">{{ formatCurrency(statusData.effectiveMonthlyFee) }}</span>
@@ -186,6 +209,7 @@
                 <th>Valor</th>
                 <th>Registrado Por</th>
                 <th>Observaciones</th>
+                <th class="text-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -204,6 +228,34 @@
                 <td class="font-bold text-dark">{{ formatCurrency(item.amount) }}</td>
                 <td class="text-sm text-gray">{{ item.registeredBy || 'Administrador' }}</td>
                 <td class="notes-cell">{{ item.notes || '-' }}</td>
+                <td class="action-cell">
+                  <div class="action-buttons-cell">
+                    <button
+                      type="button"
+                      class="btn-edit-action"
+                      title="Editar este pago"
+                      @click="openEditModal(item)"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                      </svg>
+                      <span>Editar</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn-delete-action"
+                      title="Eliminar este pago"
+                      @click="handleDeletePayment(item)"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 6h18"></path>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                      <span>Eliminar</span>
+                    </button>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -227,6 +279,14 @@
       @close="showMonthlyModal = false"
       @success="handlePaymentSuccess"
     />
+
+    <!-- MODAL DE EDICIÓN DE PAGO -->
+    <EditPaymentModal
+      :show="showEditModal"
+      :payment="selectedPaymentToEdit"
+      @close="showEditModal = false"
+      @success="handlePaymentSuccess"
+    />
   </div>
 </template>
 
@@ -235,6 +295,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { usePaymentStore } from '../../../stores/paymentStore';
 import RegistrationModal from '../../payments/components/RegistrationModal.vue';
 import MonthlyPaymentModal from '../../payments/components/MonthlyPaymentModal.vue';
+import EditPaymentModal from '../../payments/components/EditPaymentModal.vue';
 
 const props = defineProps({
   student: {
@@ -253,6 +314,8 @@ const availableYears = [currentYear - 1, currentYear, currentYear + 1];
 
 const showRegistrationModal = ref(false);
 const showMonthlyModal = ref(false);
+const showEditModal = ref(false);
+const selectedPaymentToEdit = ref(null);
 const selectedMonthForModal = ref(null);
 const selectedYearForModal = ref(currentYear);
 
@@ -283,13 +346,44 @@ const openMonthlyModal = (month = null, year = selectedYear.value) => {
   showMonthlyModal.value = true;
 };
 
+const openEditModal = (payment) => {
+  selectedPaymentToEdit.value = {
+    ...payment,
+    studentId: props.student.id,
+    studentName: `${props.student.firstName} ${props.student.lastName}`,
+    studentDocument: props.student.document
+  };
+  showEditModal.value = true;
+};
+
+const handleDeletePayment = async (payment) => {
+  if (!confirm(`¿Estás seguro de que deseas eliminar este pago (${payment.consecutive})?\nEsta acción no se puede deshacer.`)) {
+    return;
+  }
+  
+  try {
+    const targetId = payment.rawId || payment.id;
+    if (payment.type === 'INSCRIPCION') {
+      await paymentStore.deleteRegistration(targetId);
+    } else {
+      await paymentStore.deleteMonthlyPayment(targetId);
+    }
+    loadFinancialStatus();
+  } catch (error) {
+    alert(error.response?.data?.message || error.message || 'Ocurrió un error al intentar eliminar el pago');
+  }
+};
+
 const handlePaymentSuccess = () => {
   loadFinancialStatus();
 };
 
 const getMonthBoxClass = (m) => {
   if (m.isPaid) return 'box-paid';
+  if (m.status === 'OVERDUE') return 'box-overdue';
+  if (m.status === 'IN_PROGRESS') return 'box-in-progress';
   if (m.status === 'PENDING') return 'box-pending';
+  if (m.status === 'NOT_APPLICABLE') return 'box-na';
   return 'box-future';
 };
 
@@ -309,7 +403,8 @@ const formatDate = (dateString) => {
   return new Intl.DateTimeFormat('es-CO', {
     day: '2-digit',
     month: 'short',
-    year: 'numeric'
+    year: 'numeric',
+    timeZone: 'UTC'
   }).format(d);
 };
 
@@ -317,7 +412,7 @@ const formatDateShort = (dateString) => {
   if (!dateString) return '';
   const d = new Date(dateString);
   if (isNaN(d.getTime())) return '';
-  return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+  return `${d.getUTCDate()}/${d.getUTCMonth() + 1}/${d.getUTCFullYear()}`;
 };
 
 const formatMethod = (method) => {
@@ -577,9 +672,21 @@ const formatMethod = (method) => {
   border-color: #BBF7D0;
 }
 
+.box-overdue,
 .box-pending {
   background-color: #FEF2F2;
   border-color: #FECACA;
+}
+
+.box-in-progress {
+  background-color: #FFFBEB;
+  border-color: #FDE68A;
+}
+
+.box-na {
+  background-color: var(--color-gray-50);
+  border-color: var(--color-gray-200);
+  opacity: 0.6;
 }
 
 .box-future {
@@ -591,13 +698,25 @@ const formatMethod = (method) => {
 .month-top {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+}
+
+.month-name-group {
+  display: flex;
+  flex-direction: column;
 }
 
 .month-name {
   font-weight: 700;
   font-size: 0.92rem;
   color: var(--color-dark);
+}
+
+.month-period-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-gray-500);
+  margin-top: 2px;
 }
 
 .month-badge {
@@ -612,9 +731,20 @@ const formatMethod = (method) => {
   color: #15803D;
 }
 
+.month-badge.overdue,
 .month-badge.pending {
   background-color: #FEE2E2;
   color: #B91C1C;
+}
+
+.month-badge.in-progress {
+  background-color: #FEF3C7;
+  color: #D97706;
+}
+
+.month-badge.na {
+  background-color: var(--color-gray-200);
+  color: var(--color-gray-500);
 }
 
 .month-badge.future {
@@ -631,6 +761,10 @@ const formatMethod = (method) => {
 .month-amount {
   font-weight: 800;
   font-size: 1rem;
+}
+
+.text-amber {
+  color: #D97706;
 }
 
 .month-date {
@@ -650,16 +784,28 @@ const formatMethod = (method) => {
   padding: 0.35rem 0.6rem;
   font-size: 0.76rem;
   font-weight: 700;
-  background-color: var(--color-danger);
-  color: var(--color-white);
   border: none;
   border-radius: var(--border-radius-md);
   cursor: pointer;
   transition: var(--transition-fast);
 }
 
-.btn-pay-month:hover {
+.btn-pay-overdue {
+  background-color: var(--color-danger);
+  color: var(--color-white);
+}
+
+.btn-pay-overdue:hover {
   background-color: var(--color-danger-hover);
+}
+
+.btn-pay-in-progress {
+  background-color: #D97706;
+  color: var(--color-white);
+}
+
+.btn-pay-in-progress:hover {
+  background-color: #B45309;
 }
 
 /* History Card & Data Table */
@@ -745,5 +891,63 @@ const formatMethod = (method) => {
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--color-gray-500);
+}
+
+.action-cell {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.btn-edit-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #2563eb;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-edit-action:hover {
+  background-color: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
+
+.action-buttons-cell {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.btn-delete-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #dc2626;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-delete-action:hover {
+  background-color: #dc2626;
+  color: #ffffff;
+  border-color: #dc2626;
 }
 </style>

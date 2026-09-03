@@ -9,16 +9,17 @@
         <p class="login-subtitle">Unión Jaguera FC - Portal de Administración</p>
       </div>
 
-      <form class="login-form" @submit.prevent="handleSubmit">
+      <form class="login-form" @submit.prevent="handleSubmit" autocomplete="off">
         <div v-if="authStore.error" class="login-error-banner">
           {{ authStore.error }}
         </div>
 
         <BaseInput
           v-model="email"
-          label="Correo Electrónico"
-          type="email"
-          placeholder="admin@unionjaguera.com"
+          label="Usuario / Correo Electrónico"
+          type="text"
+          placeholder="Ingrese su usuario o correo"
+          autocomplete="username"
           required
         />
 
@@ -27,6 +28,7 @@
           label="Contraseña"
           type="password"
           placeholder="••••••••"
+          autocomplete="new-password"
           required
         />
 
@@ -56,8 +58,8 @@ import BaseButton from '../../../components/ui/BaseButton.vue';
 const router = useRouter();
 const authStore = useAuthStore();
 
-const email = ref('admin@unionjaguera.com');
-const password = ref('admin123');
+const email = ref('');
+const password = ref('');
 
 const handleSubmit = async () => {
   const success = await authStore.login(email.value, password.value);

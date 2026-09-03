@@ -1,8 +1,16 @@
 <template>
   <header class="app-header">
     <div class="header-title-container">
-      <h1 class="header-academy-name">Unión Jaguera FC</h1>
-      <span class="header-location">La Jagua de Ibirico, Cesar, Colombia</span>
+      <div class="header-academy-brand">
+        <div v-if="settingsStore.settings.logo" class="header-logo-img-wrap">
+          <img :src="settingsStore.settings.logo" :alt="settingsStore.settings.academyName" class="header-logo-img" />
+        </div>
+        <div v-else class="header-logo-badge">{{ academyInitial }}</div>
+        <div>
+          <h1 class="header-academy-name">{{ settingsStore.settings.academyName }}</h1>
+          <span class="header-location">{{ settingsStore.settings.address }}</span>
+        </div>
+      </div>
     </div>
 
     <div class="header-user-info">
@@ -27,12 +35,19 @@
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/authStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const settingsStore = useSettingsStore();
 
 const userInitial = computed(() => {
   const name = authStore.userName || 'A';
+  return name.charAt(0).toUpperCase();
+});
+
+const academyInitial = computed(() => {
+  const name = settingsStore.settings.academyName || 'A';
   return name.charAt(0).toUpperCase();
 });
 

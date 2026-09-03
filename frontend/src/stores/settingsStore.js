@@ -5,7 +5,7 @@ export const useSettingsStore = defineStore('settings', {
   state: () => ({
     settings: {
       academyName: 'Unión Jaguera FC',
-      shortName: 'UJFC',
+      shortName: '',
       logo: null,
       favicon: null,
       address: 'La Jagua de Ibirico, Cesar, Colombia',

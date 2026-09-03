@@ -70,6 +70,16 @@ export const usePaymentStore = defineStore('payments', {
       }
     },
 
+    async fetchRecommendedCycle(studentId, targetDate) {
+      try {
+        const response = await paymentService.getRecommendedCycle(studentId, targetDate);
+        return response;
+      } catch (err) {
+        console.error('Error fetching recommended cycle:', err);
+        return null;
+      }
+    },
+
     async registerRegistration(data) {
       this.submitting = true;
       try {
@@ -84,6 +94,46 @@ export const usePaymentStore = defineStore('payments', {
       this.submitting = true;
       try {
         const response = await paymentService.registerMonthlyPayment(data);
+        return response;
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    async updateRegistration(id, data) {
+      this.submitting = true;
+      try {
+        const response = await paymentService.updateRegistration(id, data);
+        return response;
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    async updateMonthlyPayment(id, data) {
+      this.submitting = true;
+      try {
+        const response = await paymentService.updateMonthlyPayment(id, data);
+        return response;
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    async deleteRegistration(id) {
+      this.submitting = true;
+      try {
+        const response = await paymentService.deleteRegistration(id);
+        return response;
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    async deleteMonthlyPayment(id) {
+      this.submitting = true;
+      try {
+        const response = await paymentService.deleteMonthlyPayment(id);
         return response;
       } finally {
         this.submitting = false;

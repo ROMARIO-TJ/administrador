@@ -54,7 +54,7 @@
 
       <KpiCard
         title="Total Mensualidades"
-        :value="formatCurrency(paymentStore.summary.totalAmountCollected)"
+        :value="formatCurrency(paymentStore.summary.monthlyAmountCollected || 0)"
         :subtitle="`${paymentStore.summary.monthlyCount} mensualidades registradas`"
         iconBgColor="#FEF3C7"
         iconColor="#D97706"
@@ -71,8 +71,8 @@
 
       <KpiCard
         title="Total Inscripciones"
-        :value="`${paymentStore.summary.registrationCount} Inscripciones`"
-        subtitle="Alumnos matriculados"
+        :value="formatCurrency(paymentStore.summary.registrationAmountCollected || 0)"
+        :subtitle="`${paymentStore.summary.registrationCount} alumnos matriculados`"
         iconBgColor="#F3E8FF"
         iconColor="#9333EA"
       >
@@ -156,6 +156,7 @@
               <th>Método</th>
               <th>Valor</th>
               <th>Registrado Por</th>
+              <th class="text-center">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -182,6 +183,34 @@
               </td>
               <td class="font-bold text-dark">{{ formatCurrency(item.amount) }}</td>
               <td class="text-sm text-muted">{{ item.registeredBy || 'Administrador' }}</td>
+              <td class="action-cell">
+                <div class="action-buttons-cell">
+                  <button
+                    type="button"
+                    class="btn-edit-action"
+                    title="Editar datos de este pago"
+                    @click="openEditModal(item)"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                    <span>Editar</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-delete-action"
+                    title="Eliminar este pago"
+                    @click="handleDeletePayment(item)"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 6h18"></path>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    <span>Eliminar</span>
+                  </button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -202,6 +231,14 @@
       @close="showMonthlyModal = false"
       @success="handlePaymentSuccess"
     />
+
+    <!-- MODAL DE EDICIÓN DE PAGOS -->
+    <EditPaymentModal
+      :show="showEditModal"
+      :payment="selectedPaymentToEdit"
+      @close="showEditModal = false"
+      @success="handlePaymentSuccess"
+    />
   </div>
 </template>
 
@@ -213,6 +250,7 @@ import { useStudentStore } from '../../../stores/studentStore';
 import { useDashboardStore } from '../../../stores/dashboardStore';
 import RegistrationModal from '../components/RegistrationModal.vue';
 import MonthlyPaymentModal from '../components/MonthlyPaymentModal.vue';
+import EditPaymentModal from '../components/EditPaymentModal.vue';
 
 const paymentStore = usePaymentStore();
 const studentStore = useStudentStore();
@@ -220,6 +258,8 @@ const dashboardStore = useDashboardStore();
 
 const showRegistrationModal = ref(false);
 const showMonthlyModal = ref(false);
+const showEditModal = ref(false);
+const selectedPaymentToEdit = ref(null);
 
 const currentY = new Date().getFullYear();
 const availableYears = [currentY - 1, currentY, currentY + 1];
@@ -258,6 +298,29 @@ const openMonthlyModal = () => {
   showMonthlyModal.value = true;
 };
 
+const openEditModal = (payment) => {
+  selectedPaymentToEdit.value = payment;
+  showEditModal.value = true;
+};
+
+const handleDeletePayment = async (payment) => {
+  if (!confirm(`¿Estás seguro de que deseas eliminar este pago (${payment.consecutive}) de ${payment.studentName}?\nEsta acción no se puede deshacer.`)) {
+    return;
+  }
+  
+  try {
+    const targetId = payment.rawId || payment.id;
+    if (payment.type === 'INSCRIPCION') {
+      await paymentStore.deleteRegistration(targetId);
+    } else {
+      await paymentStore.deleteMonthlyPayment(targetId);
+    }
+    await handlePaymentSuccess();
+  } catch (error) {
+    alert(error.response?.data?.message || error.message || 'Ocurrió un error al intentar eliminar el pago');
+  }
+};
+
 const handlePaymentSuccess = async () => {
   await Promise.all([
     applyFilters(),
@@ -289,7 +352,8 @@ const formatDate = (dateString) => {
   return new Intl.DateTimeFormat('es-CO', {
     day: '2-digit',
     month: 'short',
-    year: 'numeric'
+    year: 'numeric',
+    timeZone: 'UTC'
   }).format(d);
 };
 
@@ -545,5 +609,64 @@ const formatMethod = (method) => {
   background-color: var(--color-gray-100);
   border-radius: var(--border-radius-md);
   font-weight: 600;
+}
+
+.action-cell {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.btn-edit-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #2563eb;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-edit-action:hover {
+  background-color: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
+
+.action-buttons-cell {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.btn-delete-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #dc2626;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-delete-action:hover {
+  background-color: #dc2626;
+  color: #ffffff;
+  border-color: #dc2626;
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);
 }
 </style>

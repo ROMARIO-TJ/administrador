@@ -19,76 +19,78 @@
           <button type="button" class="close-btn" @click="close">&times;</button>
         </div>
 
-        <form @submit.prevent="handleSubmit" class="modal-body">
-          <div v-if="errorMessage" class="alert alert-danger">
-            {{ errorMessage }}
-          </div>
+        <form @submit.prevent="handleSubmit" class="modal-form-content">
+          <div class="modal-body">
+            <div v-if="errorMessage" class="alert alert-danger">
+              {{ errorMessage }}
+            </div>
 
-          <!-- Selección de Alumno (Si no viene pre-seleccionado) -->
-          <div class="form-group" v-if="!student">
-            <label class="form-label">Alumno <span class="required">*</span></label>
-            <select v-model="form.studentId" class="form-control" required>
-              <option value="" disabled>Seleccione un alumno...</option>
-              <option v-for="st in students" :key="st.id" :value="st.id">
-                {{ st.firstName }} {{ st.lastName }} — {{ st.document }} ({{ st.category ? st.category.name : 'Sin categoría' }})
-              </option>
-            </select>
-          </div>
-
-          <!-- Alumno Fijo (Si ya está seleccionado) -->
-          <div class="student-info-badge" v-else>
-            <span class="label">Alumno:</span>
-            <strong>{{ student.firstName }} {{ student.lastName }}</strong>
-            <span class="doc">Doc: {{ student.document }}</span>
-          </div>
-
-          <!-- Valor de la Inscripción -->
-          <div class="form-group">
-            <label class="form-label">Valor de Inscripción (COP) <span class="required">*</span></label>
-            <div class="input-prefix-wrapper">
-              <span class="prefix-symbol">$</span>
-              <input
-                type="number"
-                v-model.number="form.amount"
-                class="form-control prefixed"
-                placeholder="50000"
-                min="0"
-                step="1000"
+            <!-- Selección de Alumno con Buscador Interactivo -->
+            <div class="form-group" v-if="!student">
+              <label class="form-label">Alumno <span class="required">*</span></label>
+              <StudentSearchSelect
+                v-model="form.studentId"
+                :students="students"
+                placeholder="Buscar por nombre, documento o categoría..."
                 required
               />
             </div>
-            <small class="hint-text">
-              Tarifa sugerida por configuración del sistema. Se puede modificar si aplica un descuento o ajuste.
-            </small>
-          </div>
 
-          <div class="form-row-2">
-            <!-- Fecha de Pago -->
-            <div class="form-group">
-              <label class="form-label">Fecha de Pago <span class="required">*</span></label>
-              <input type="date" v-model="form.paymentDate" class="form-control" required />
+            <!-- Alumno Fijo (Si ya está seleccionado) -->
+            <div class="student-info-badge" v-else>
+              <span class="label">Alumno:</span>
+              <strong>{{ student.firstName }} {{ student.lastName }}</strong>
+              <span class="doc">Doc: {{ student.document }}</span>
             </div>
 
-            <!-- Método de Pago -->
+            <!-- Valor de la Inscripción -->
             <div class="form-group">
-              <label class="form-label">Método de Pago <span class="required">*</span></label>
-              <select v-model="form.paymentMethod" class="form-control" required>
-                <option v-for="pm in activePaymentMethods" :key="pm.id" :value="pm.name.toUpperCase()">
-                  {{ pm.name }}
-                </option>
-              </select>
+              <label class="form-label">Valor de Inscripción (COP) <span class="required">*</span></label>
+              <div class="input-prefix-wrapper">
+                <span class="prefix-symbol">$</span>
+                <input
+                  type="number"
+                  v-model.number="form.amount"
+                  class="form-control prefixed"
+                  placeholder="50000"
+                  min="0"
+                  step="1000"
+                  required
+                />
+              </div>
+              <small class="hint-text">
+                Tarifa sugerida por configuración del sistema. Se puede modificar si aplica un descuento o ajuste.
+              </small>
             </div>
-          </div>
 
-          <!-- Observaciones -->
-          <div class="form-group">
-            <label class="form-label">Observaciones / Notas (Opcional)</label>
-            <textarea
-              v-model="form.notes"
-              class="form-control textarea"
-              rows="2"
-              placeholder="Escriba aquí alguna nota relevante sobre el recibo..."
-            ></textarea>
+            <div class="form-row-2">
+              <!-- Fecha de Pago -->
+              <div class="form-group">
+                <label class="form-label">Fecha de Pago <span class="required">*</span></label>
+                <input type="date" v-model="form.paymentDate" class="form-control" required />
+              </div>
+
+              <!-- Método de Pago -->
+              <div class="form-group">
+                <label class="form-label">Método de Pago <span class="required">*</span></label>
+                <select v-model="form.paymentMethod" class="form-control" required>
+                  <option v-for="pm in activePaymentMethods" :key="pm.id" :value="pm.name.toUpperCase()">
+                    {{ pm.name }}
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Observaciones -->
+            <div class="form-group">
+              <label class="form-label">Observaciones / Notas (Opcional)</label>
+              <textarea
+                v-model="form.notes"
+                class="form-control textarea"
+                rows="2"
+                placeholder="Escriba aquí alguna nota relevante sobre el recibo..."
+              ></textarea>
+            </div>
           </div>
 
           <!-- Footer Botones -->
@@ -111,6 +113,7 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { usePaymentStore } from '../../../stores/paymentStore';
 import { useSettingsStore } from '../../../stores/settingsStore';
+import StudentSearchSelect from '../../../components/ui/StudentSearchSelect.vue';
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -234,6 +237,7 @@ const handleSubmit = async () => {
 .modal-card {
   width: 100%;
   max-width: 540px;
+  max-height: 90vh;
   background: var(--color-white);
   border-radius: var(--border-radius-lg);
   box-shadow: var(--shadow-lg);
@@ -262,6 +266,7 @@ const handleSubmit = async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .modal-title-box {
@@ -308,11 +313,21 @@ const handleSubmit = async () => {
   color: var(--color-dark);
 }
 
+.modal-form-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .modal-body {
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .alert {
@@ -418,7 +433,10 @@ const handleSubmit = async () => {
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
-  margin-top: 0.5rem;
+  padding: 1rem 1.5rem;
+  background-color: var(--color-gray-100);
+  border-top: 1px solid var(--color-gray-200);
+  flex-shrink: 0;
 }
 
 .btn {

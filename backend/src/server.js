@@ -1,11 +1,16 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import apiRoutes from './routes/index.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
+// Asegurar que siempre se lea el .env del backend, independientemente de dónde se llame
+dotenv.config({ path: path.join(__dirname, '../.env') });
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -32,6 +37,17 @@ app.get('/health', (req, res) => {
 
 // Enrutamiento de la API central
 app.use('/api', apiRoutes);
+
+// Servir frontend compilado (Producción/Electron)
+const frontendPath = path.join(__dirname, '../../frontend/dist');
+app.use(express.static(frontendPath));
+
+// Fallback para Vue Router (Cualquier ruta no de API sirve index.html)
+app.get('*', (req, res) => {
+  if (!req.url.startsWith('/api')) {
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  }
+});
 
 // Middleware centralizado para manejo de errores
 app.use(errorHandler);
